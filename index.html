@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCANR PRO — Advanced Warehouse OS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0c10;--surface:#12161f;--surface2:#1a202d;--surface3:#232a3a;
+  --border:#2a3344;--border2:#3a4558;--text:#e8edf5;--text2:#8a96a8;--text3:#5a6478;
+  --accent:#00d4ff;--green:#00ff9d;--red:#ff4d6b;--amber:#ffd60a;
+  --font:'Courier New',monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; min-height:100vh; }
+.nav { background:var(--surface); border-bottom:1px solid var(--border); padding:0 24px; height:64px; display:flex; align-items:center; position:sticky; top:0; z-index:1000; }
+.nav-logo { font-size:24px; font-weight:bold; color:var(--accent); letter-spacing:4px; }
+.status-dot { width:12px; height:12px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); display:inline-block; margin-right:8px; }
+
+.view { display:none; padding:24px; max-width:1600px; margin:0 auto; }
+.view.active { display:block; }
+
+.card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:20px; box-shadow:0 4px 15px rgba(0,0,0,0.4); }
+.btn { padding:12px 24px; border:none; border-radius:8px; font-family:var(--font); cursor:pointer; transition:all .2s; font-size:15px; }
+.btn.primary { background:var(--accent); color:#000; font-weight:bold; }
+.btn.danger { background:var(--red); color:white; }
+
+.scan-input { width:100%; padding:24px 24px 24px 70px; background:var(--surface3); border:3px solid var(--border2); border-radius:14px; color:var(--text); font-size:26px; letter-spacing:4px; outline:none; }
+.scan-input:focus { border-color:var(--accent); box-shadow:0 0 0 5px rgba(0,212,255,0.3); }
+
+.scan-result { padding:20px; border-radius:12px; margin:15px 0; font-size:18px; display:none; font-weight:bold; }
+.scan-result.show { display:block; animation:pop 0.4s; }
+.scan-result.success { background:rgba(0,255,157,0.15); border:2px solid var(--green); color:var(--green); }
+.scan-result.fail { background:rgba(255,77,107,0.15); border:2px solid var(--red); color:var(--red); }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setupScreen" class="view active" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div class="card" style="max-width:480px;width:92%;text-align:center;padding:50px 30px;">
+    <h1 style="font-size:48px;color:var(--accent);margin-bottom:8px;">⬡ SCANR PRO</h1>
+    <p style="color:var(--text3);margin-bottom:40px;">Advanced Warehouse System</p>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:30px 0;">
+      <div onclick="selectRole('admin')" id="roleAdmin" class="card" style="cursor:pointer;padding:30px 20px;">👑 ADMIN</div>
+      <div onclick="selectRole('station')" id="roleStation" class="card" style="cursor:pointer;padding:30px 20px;">⬡ STATION</div>
+    </div>
+
+    <select id="stationSelect" class="scan-input" style="display:none;font-size:16px;padding:16px;">
+      <option value="1">Station 1</option><option value="2">Station 2</option>
+      <option value="3">Station 3</option><option value="4">Station 4</option>
+    </select>
+
+    <input type="password" id="adminPass" class="scan-input" placeholder="Admin Password" style="display:none;margin-top:12px;">
+    <button class="btn primary" style="width:100%;margin-top:30px;padding:18px;font-size:18px;" onclick="enterApp()">ENTER →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none;">
+  <nav class="nav">
+    <div class="nav-logo">SCANR PRO</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:16px;">
+      <span id="userInfo" style="color:var(--accent);font-weight:bold;"></span>
+      <button class="btn danger" onclick="logout()">LOGOUT</button>
+    </div>
+  </nav>
+
+  <!-- SCANNER VIEW -->
+  <div id="scannerView" class="view active">
+    <h1 id="scannerTitle" style="text-align:center;margin-bottom:20px;color:var(--accent);font-size:28px;"></h1>
+
+    <div class="card">
+      <video id="video" width="100%" height="340" style="background:#000;border-radius:12px;display:block;"></video>
+      <button class="btn primary" style="width:100%;margin-top:12px;" onclick="toggleCamera()">📷 CAMERA SCANNER</button>
+    </div>
+
+    <div class="card">
+      <input id="scanInput" class="scan-input" placeholder="YA MANUAL SCAN KARO..." autofocus>
+      <div id="scanResult" class="scan-result"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================== MAIN SCRIPT ==================
+let role = '', stationId = '';
+
+function selectRole(r) {
+  role = r;
+  document.getElementById('stationSelect').style.display = r === 'station' ? 'block' : 'none';
+  document.getElementById('adminPass').style.display = (r === 'admin') ? 'block' : 'none';
+}
+
+function enterApp() {
+  if (role === 'admin' && document.getElementById('adminPass').value !== 'admin123') {
+    alert("❌ Wrong Password");
+    return;
+  }
+  if (role === 'station') stationId = document.getElementById('stationSelect').value;
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userInfo').textContent = role.toUpperCase() + (stationId ? ` • S${stationId}` : '');
+
+  if (role === 'station') {
+    document.getElementById('scannerTitle').textContent = `STATION ${stationId} - READY`;
+    document.getElementById('scanInput').focus();
+  }
+}
+
+function logout() { location.reload(); }
+
+// Camera Scanner
+let stream = null;
+async function toggleCamera() {
+  const video = document.getElementById('video');
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+    return;
+  }
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = stream;
+  } catch (err) {
+    alert("Camera access nahi mila. HTTPS pe chalana zaroori hai.");
+  }
+}
+
+// Manual Scan
+document.getElementById('scanInput').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    const code = this.value.trim();
+    if (code) processScan(code);
+    this.value = '';
+  }
+});
+
+function processScan(code) {
+  const result = document.getElementById('scanResult');
+  result.className = 'scan-result show success';
+  result.innerHTML = `✅ SCANNED<br><b>${code}</b>`;
+  
+  if ('speechSynthesis' in window) {
+    const speech = new SpeechSynthesisUtterance("Scan successful ho gaya");
+    speechSynthesis.speak(speech);
+  }
+
+  setTimeout(() => result.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
