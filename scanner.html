@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSFR-DBS — Order Scanner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+:root{
+  --bg:#f0f4ff;--bg2:#e8edf8;--surface:#ffffff;--surface2:#f5f7ff;--surface3:#edf0fa;
+  --border:rgba(99,102,241,.12);--border2:rgba(99,102,241,.2);
+  --text:#1e2140;--text2:#4b5280;--text3:#9096b8;
+  --accent:#4f46e5;--accent2:#7c3aed;--accent-dim:rgba(79,70,229,.08);--accent-light:rgba(79,70,229,.18);
+  --green:#059669;--green-dim:rgba(5,150,105,.08);--green-light:rgba(5,150,105,.2);
+  --red:#dc2626;--red-dim:rgba(220,38,38,.07);--red-light:rgba(220,38,38,.18);
+  --amber:#d97706;--amber-dim:rgba(217,119,6,.08);--amber-light:rgba(217,119,6,.2);
+  --purple:#7c3aed;--purple-dim:rgba(124,58,237,.08);--purple-light:rgba(124,58,237,.2);
+  --teal:#0891b2;--navy:#1e2140;
+  --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono','Courier New',monospace;
+  --shadow:0 1px 4px rgba(79,70,229,.08),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 16px rgba(79,70,229,.1),0 2px 6px rgba(0,0,0,.06);
+  --shadow-lg:0 12px 40px rgba(79,70,229,.12),0 4px 12px rgba(0,0,0,.08);
+  --glow-blue:0 0 20px rgba(79,70,229,.2);
+  --glow-green:0 0 20px rgba(5,150,105,.2);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;min-height:100vh;}
+
+/* NAV */
+.nav{background:rgba(255,255,255,.85);backdrop-filter:blur(20px);padding:0 24px;display:flex;align-items:center;height:58px;border-bottom:1px solid var(--border2);position:sticky;top:0;z-index:50;box-shadow:0 1px 12px rgba(79,70,229,.07);}
+.nav-logo-wrap{display:flex;align-items:center;gap:10px;margin-right:auto;}
+.nav-logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;box-shadow:var(--glow-blue);}
+.nav-logo-text{display:flex;flex-direction:column;line-height:1.2;}
+.nav-logo-main{font-size:14px;font-weight:700;color:var(--text);letter-spacing:.5px;}
+.nav-logo-sub{font-size:9px;color:var(--text3);letter-spacing:2.5px;text-transform:uppercase;}
+.nav-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-right:20px;}
+.fb-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);}
+.fb-dot.ok{background:var(--green);box-shadow:0 0 8px rgba(5,150,105,.5);}
+.fb-dot.err{background:var(--red);}
+.nav-btn{padding:8px 16px;border:none;background:transparent;color:var(--text3);font-family:var(--font);font-size:12px;cursor:pointer;height:58px;transition:all .2s;font-weight:600;letter-spacing:.5px;position:relative;}
+.nav-btn:hover{color:var(--text);}
+.nav-btn.active{color:var(--accent);}
+.nav-btn.active::after{content:'';position:absolute;bottom:0;left:12px;right:12px;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px 2px 0 0;}
+.logout-btn{color:var(--red)!important;opacity:.7;}
+.logout-btn:hover{opacity:1!important;}
+
+/* VIEWS */
+.view{display:none;padding:24px 28px;max-width:1400px;margin:0 auto;}
+.view.active{display:block;}
+#scannerView{padding:0;max-width:100%;}
+.page-header{margin-bottom:24px;}
+.page-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.page-sub{font-size:12px;color:var(--text3);letter-spacing:.5px;}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow);}
+.card-title{font-size:10px;letter-spacing:2px;color:var(--text3);margin-bottom:14px;text-transform:uppercase;font-weight:600;}
+
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.stat-label{font-size:10px;color:var(--text3);letter-spacing:1.5px;margin-bottom:8px;font-weight:600;text-transform:uppercase;}
+.stat-val{font-size:28px;font-weight:800;color:var(--text);}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border2);border-radius:14px;padding:40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface2);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-dim);}
+input[type=file]{display:none;}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border:1px solid var(--border2);border-radius:9px;background:var(--surface);color:var(--text2);font-family:var(--font);font-size:13px;cursor:pointer;transition:all .15s;font-weight:600;}
+.btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;box-shadow:var(--glow-blue);}
+.btn.primary:hover{opacity:.9;transform:translateY(-1px);}
+.btn.success{background:var(--green);border:none;color:#fff;}
+.btn.success:hover{opacity:.9;}
+.btn.danger{border-color:var(--red-light);color:var(--red);background:var(--red-dim);}
+.btn.danger:hover{background:var(--red-light);}
+.btn.amber-btn{background:var(--amber);border:none;color:#fff;}
+.btn.sm{padding:5px 12px;font-size:11px;}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:var(--surface2);color:var(--text3);font-size:10px;letter-spacing:1.5px;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border2);font-weight:600;text-transform:uppercase;}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text2);}
+tr:hover td{background:var(--surface2);}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;letter-spacing:.5px;font-weight:700;}
+.badge.pending{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber-light);}
+.badge.scanned,.badge.complete{background:var(--green-dim);color:var(--green);border:1px solid var(--green-light);}
+.badge.error{background:var(--red-dim);color:var(--red);border:1px solid var(--red-light);}
+.badge.partial{background:var(--purple-dim);color:var(--purple);border:1px solid var(--purple-light);}
+
+/* PROGRESS */
+.prog-wrap{background:var(--surface3);border-radius:999px;height:6px;overflow:hidden;}
+.prog-bar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--teal));transition:width .4s;}
+
+/* STATIONS */
+.stations-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+@media(max-width:800px){.stations-grid{grid-template-columns:1fr;}}
+.station-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow);}
+.station-card.active-station{border-color:var(--green);box-shadow:var(--glow-green);}
+.station-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);}
+.station-dot.online{background:var(--green);box-shadow:0 0 8px rgba(5,150,105,.5);}
+
+/* SCANNER */
+.scanner-view{max-width:580px;margin:0 auto;height:calc(100vh - 58px);display:flex;flex-direction:column;overflow:hidden;}
+.scanner-fixed-top{flex-shrink:0;background:var(--bg);padding:8px 12px 0;z-index:10;}
+.scanner-body{flex:1;overflow-y:auto;padding:8px 12px 20px;display:flex;flex-direction:column;gap:8px;}
+.scanner-body::-webkit-scrollbar{width:4px;}
+.scanner-body::-webkit-scrollbar-track{background:transparent;}
+.scanner-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+.scan-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow-md);}
+.scan-input-wrap{position:relative;margin-bottom:8px;}
+.scan-input{width:100%;padding:15px 16px 15px 50px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:11px;color:var(--text);font-family:var(--mono);font-size:17px;letter-spacing:2px;outline:none;transition:all .2s;}
+.scan-input:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-dim);}
+.scan-input::placeholder{color:var(--text3);font-size:13px;letter-spacing:.5px;}
+.scan-icon{position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--text3);}
+.scan-result{border-radius:10px;padding:12px 16px;margin-top:10px;font-size:13px;font-weight:600;display:none;}
+.scan-result.success{background:var(--green-dim);border:1px solid var(--green-light);color:var(--green);}
+.scan-result.fail{background:var(--red-dim);border:1px solid var(--red-light);color:var(--red);}
+.scan-result.duplicate{background:var(--amber-dim);border:1px solid var(--amber-light);color:var(--amber);}
+.scan-result.show{display:block;}
+.scan-history{max-height:320px;overflow-y:auto;}
+.scan-log-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(30,33,64,.4);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:28px;min-width:340px;max-width:520px;width:90%;box-shadow:var(--shadow-lg);}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:18px;color:var(--text);}
+.modal-input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;margin-bottom:12px;}
+.modal-input:focus{border-color:var(--accent);background:#fff;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px;}
+
+/* SETUP */
+.setup-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(79,70,229,.1) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(124,58,237,.08) 0%,transparent 50%);}
+.setup-card{background:var(--surface);border:1px solid var(--border2);border-radius:22px;padding:36px;max-width:420px;width:90%;text-align:center;box-shadow:var(--shadow-lg);}
+.setup-logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px;}
+.setup-logo-icon{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;box-shadow:var(--glow-blue);}
+.setup-logo-text{text-align:left;}
+.setup-logo-main{font-size:22px;font-weight:800;color:var(--text);letter-spacing:.5px;}
+.setup-logo-sub{font-size:10px;color:var(--text3);letter-spacing:3px;}
+.setup-divider{height:1px;background:var(--border);margin:20px 0;}
+.setup-label{font-size:11px;color:var(--text3);letter-spacing:1.5px;margin-bottom:12px;font-weight:600;text-transform:uppercase;}
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.role-btn{background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;padding:18px 10px;cursor:pointer;transition:all .2s;}
+.role-btn:hover{border-color:var(--accent);background:var(--accent-dim);}
+.role-btn.selected{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 3px var(--accent-dim);}
+.role-icon{font-size:26px;margin-bottom:8px;}
+.role-label{font-size:12px;font-weight:700;color:var(--text);letter-spacing:.5px;}
+
+/* TABS */
+.tab-bar{display:flex;border-bottom:1px solid var(--border2);margin-bottom:20px;gap:4px;}
+.tab{padding:9px 18px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px;background:none;border-top:none;border-left:none;border-right:none;transition:all .2s;letter-spacing:.5px;}
+.tab:hover{color:var(--text2);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ALERTS */
+.alert{border-radius:10px;padding:11px 15px;font-size:12px;margin-bottom:14px;font-weight:600;}
+.alert.info{background:var(--accent-dim);border:1px solid var(--accent-light);color:var(--accent);}
+.alert.success{background:var(--green-dim);border:1px solid var(--green-light);color:var(--green);}
+.alert.warn{background:var(--amber-dim);border:1px solid var(--amber-light);color:var(--amber);}
+
+/* STEP INDICATOR */
+.step-bar{display:flex;margin-bottom:6px;background:var(--surface);border:1px solid var(--border2);border-radius:11px;overflow:hidden;box-shadow:var(--shadow);}
+.step-item{flex:1;padding:11px;text-align:center;font-size:10px;letter-spacing:1px;font-weight:700;border-right:1px solid var(--border);color:var(--text3);transition:all .3s;}
+.step-item:last-child{border-right:none;}
+.step-item.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+.step-item.done{background:var(--green-dim);color:var(--green);}
+
+/* ACTIVE ORDER PANEL */
+.active-order-panel{background:linear-gradient(135deg,rgba(79,70,229,.06),rgba(8,145,178,.04));border:1px solid var(--accent-light);border-radius:14px;padding:14px 16px;}
+
+/* SCANNER HEADER */
+.scanner-header{background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:14px;padding:12px 16px;color:#fff;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-md);margin-bottom:6px;}
+.scanner-header-logo{width:36px;height:36px;background:rgba(255,255,255,.2);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;}
+.station-pulse{width:8px;height:8px;border-radius:50%;background:#a7f3d0;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(167,243,208,.6);}50%{opacity:.9;box-shadow:0 0 0 6px rgba(167,243,208,0);}}
+.pulse{animation:pulse 2s infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{animation:spin .8s linear infinite;display:inline-block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeIn .25s ease;}
+
+.sep{height:1px;background:var(--border);margin:16px 0;}
+.flex-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.ml-auto{margin-left:auto;}
+.mb-16{margin-bottom:16px;}
+.mt-16{margin-top:16px;}
+.empty-state{text-align:center;padding:48px;color:var(--text3);font-size:13px;}
+.order-search{width:100%;max-width:320px;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;}
+.order-search:focus{border-color:var(--accent);}
+.hidden-row{display:none;}
+
+/* COMPLETE SCREEN */
+.complete-screen{background:linear-gradient(135deg,rgba(5,150,105,.07),rgba(8,145,178,.05));border:1px solid var(--green-light);border-radius:16px;padding:28px;text-align:center;margin-bottom:14px;box-shadow:var(--shadow-md);}
+.complete-check{width:64px;height:64px;background:linear-gradient(135deg,var(--green),var(--teal));border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:30px;color:#fff;box-shadow:var(--glow-green);}
+
+@media(max-width:600px){
+  .view{padding:12px!important;}
+  .stat-grid{grid-template-columns:1fr 1fr!important;}
+  .scan-input{font-size:16px!important;padding:14px 14px 14px 44px!important;}
+  .scanner-view{padding:0!important;}
+  nav .nav-logo-text .nav-logo-sub{display:none;}
+  .stations-grid{grid-template-columns:1fr 1fr!important;}
+}
+@media(max-width:400px){
+  .stat-grid{grid-template-columns:1fr!important;}
+  .role-grid{grid-template-columns:1fr!important;}
+}
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:var(--surface2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+/* CAMERA SCANNER */
+.cam-strip{display:none;flex-direction:column;background:var(--surface3);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-md);margin-bottom:6px;border:1.5px solid var(--border2);}
+.cam-strip.active{display:flex;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim),var(--shadow-md);}
+.cam-strip-video-wrap{position:relative;width:100%;height:140px;background:#111;overflow:hidden;}
+#camVideo{width:100%;height:100%;object-fit:cover;display:block;}
+.cam-overlay{position:absolute;inset:0;pointer-events:none;}
+.cam-finder{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:78%;height:86px;border:1.5px solid rgba(255,255,255,.8);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,.4);}
+.cam-finder::before,.cam-finder::after{content:'';position:absolute;width:16px;height:16px;border-color:var(--accent);border-style:solid;}
+.cam-finder::before{top:-2px;left:-2px;border-width:2.5px 0 0 2.5px;border-radius:4px 0 0 0;}
+.cam-finder::after{bottom:-2px;right:-2px;border-width:0 2.5px 2.5px 0;border-radius:0 0 4px 0;}
+.cam-scan-line{position:absolute;left:4%;right:4%;height:1.5px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scanLine 1.8s ease-in-out infinite;box-shadow:0 0 6px var(--accent);}
+@keyframes scanLine{0%{top:12%;}100%{top:88%;}}
+.cam-finder-label{position:absolute;bottom:7px;left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:9px;letter-spacing:2px;font-weight:600;}
+.cam-mode-badge{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(79,70,229,.85);backdrop-filter:blur(8px);color:#fff;font-size:9px;font-weight:700;letter-spacing:2px;padding:3px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);}
+.cam-result-bar{padding:8px 14px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:6px;min-height:32px;transition:all .2s;}
+.cam-result-bar.idle{background:var(--surface2);color:var(--text3);font-weight:500;border-top:1px solid var(--border);}
+.cam-result-bar.ok{background:var(--green-dim);color:var(--green);border-top:1px solid var(--green-light);}
+.cam-result-bar.fail{background:var(--red-dim);color:var(--red);border-top:1px solid var(--red-light);}
+.cam-result-bar.dup{background:var(--amber-dim);color:var(--amber);border-top:1px solid var(--amber-light);}
+.cam-controls{display:flex;gap:6px;padding:7px 10px;background:var(--surface2);border-top:1px solid var(--border);align-items:center;}
+.cam-stop-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--red-light);background:var(--red-dim);color:var(--red);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .2s;}
+.cam-stop-btn:hover{background:var(--red);color:#fff;}
+.cam-torch-btn{padding:8px 11px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:14px;cursor:pointer;transition:all .2s;}
+.cam-torch-btn:hover{border-color:var(--accent);}
+.cam-start-btn{width:100%;padding:12px;border-radius:11px;border:1.5px solid var(--accent-light);background:var(--accent-dim);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;margin-bottom:6px;}
+.cam-start-btn:hover{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow-blue);border-color:transparent;}
+.cam-start-btn:active{transform:scale(.98);}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div class="setup-screen" id="setupScreen">
+  <div style="background:var(--surface);border:1px solid var(--border2);border-radius:24px;padding:40px 36px;max-width:400px;width:92%;text-align:center;box-shadow:var(--shadow-lg);">
+    
+    <!-- Logo -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px">
+      <div style="width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;box-shadow:var(--glow-blue)">S</div>
+      <div style="text-align:left">
+        <div style="font-size:22px;font-weight:800;color:var(--text);letter-spacing:.5px">SSFR-DBS</div>
+        <div style="font-size:10px;color:var(--text3);letter-spacing:3px;text-transform:uppercase">Order Scanner</div>
+      </div>
+    </div>
+
+    <!-- Firebase status -->
+    <div id="fbStatus" style="font-size:12px;color:var(--green);margin:12px 0 20px;font-weight:500">✓ Ready</div>
+
+    <div style="height:1px;background:var(--border);margin-bottom:24px"></div>
+
+    <!-- Role dropdown -->
+    <div style="margin-bottom:16px;text-align:left">
+      <label style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:8px">Select Role</label>
+      <div style="position:relative">
+        <select id="roleSelect" onchange="selectRoleFromDropdown(this.value)"
+          style="width:100%;padding:13px 44px 13px 16px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:12px;color:var(--text);font-family:var(--font);font-size:14px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;transition:all .2s">
+          <option value="">— Choose your role —</option>
+          <option value="admin">⚙️  Admin</option>
+          <option value="station">📦  Station</option>
+          <option value="view">👁️  View Only</option>
+        </select>
+        <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--accent);font-size:12px">▼</div>
+      </div>
+    </div>
+
+    <!-- Station select (hidden by default) -->
+    <div id="stationSelectWrap" style="display:none;margin-bottom:16px;text-align:left">
+      <label style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:8px">Select Station</label>
+      <div style="position:relative">
+        <select id="stationSelect"
+          style="width:100%;padding:13px 44px 13px 16px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:12px;color:var(--text);font-family:var(--font);font-size:14px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none">
+          <option value="1">🖥  Station 1</option>
+          <option value="2">🖥  Station 2</option>
+          <option value="3">🖥  Station 3</option>
+          <option value="4">🖥  Station 4</option>
+        </select>
+        <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--accent);font-size:12px">▼</div>
+      </div>
+    </div>
+
+    <!-- Password fields -->
+    <div id="stationPassWrap" style="display:none;margin-bottom:16px;text-align:left">
+      <label style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:8px">Password</label>
+      <input class="modal-input" type="password" id="stationPass" placeholder="Enter station password..." onkeydown="if(event.key==='Enter')enterApp()" style="margin-bottom:0;padding:13px 16px;border-radius:12px;font-size:14px;border:1.5px solid var(--border2)"/>
+    </div>
+    <div id="adminPassWrap" style="display:none;margin-bottom:16px;text-align:left">
+      <label style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:2px;text-transform:uppercase;display:block;margin-bottom:8px">Password</label>
+      <input class="modal-input" type="password" id="adminPass" placeholder="Enter admin password..." onkeydown="if(event.key==='Enter')enterApp()" style="margin-bottom:0;padding:13px 16px;border-radius:12px;font-size:14px;border:1.5px solid var(--border2)"/>
+    </div>
+
+    <!-- Enter button -->
+    <button onclick="enterApp()" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:12px;color:#fff;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.5px;box-shadow:0 4px 16px rgba(79,70,229,.35);transition:all .2s" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 20px rgba(79,70,229,.45)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(79,70,229,.35)'">
+      Enter →
+    </button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none">
+  <nav class="nav">
+    <div class="nav-logo-wrap">
+      <div class="nav-logo-icon">S</div>
+      <div class="nav-logo-text">
+        <div class="nav-logo-main">SSFR-DBS</div>
+        <div class="nav-logo-sub">ORDER SCANNER</div>
+      </div>
+    </div>
+    <div class="nav-status">
+      <span class="fb-dot" id="fbDot"></span><span id="fbLabel">connecting...</span>
+    </div>
+    <button class="nav-btn" id="navAdmin" onclick="showView('admin')" style="display:none">ADMIN</button>
+    <button class="nav-btn" id="navScanner" onclick="showView('scanner')" style="display:none">SCANNER</button>
+    <button class="nav-btn" onclick="logout()" style="color:#fc8181">LOGOUT</button>
+  </nav>
+
+  <!-- ADMIN VIEW -->
+  <div class="view" id="adminView">
+    <div class="page-header">
+      <h1 class="page-title">Admin Panel</h1>
+      <p class="page-sub">Upload Orders · Monitor Stations · Live Sync</p>
+    </div>
+    <div style="margin-bottom:20px">
+      <select class="modal-input" style="max-width:260px;margin-bottom:0;font-weight:600;font-size:14px" onchange="switchTabByVal(this.value)" id="adminMenuSelect">
+        <option value="tabUpload">📂 Upload Orders</option>
+        <option value="tabOrders">📋 Order List</option>
+        <option value="tabStations">🖥 Stations</option>
+        <option value="tabExport">⬇ Export</option>
+      </select>
+    </div>
+
+    <!-- UPLOAD TAB -->
+    <div class="tab-panel active" id="tabUpload">
+      <!-- Date Filter Bar -->
+      <div class="card" style="padding:14px 18px;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Filter by Date:</span>
+          <input type="date" id="statFromDate" class="modal-input" style="margin-bottom:0;max-width:160px;padding:7px 10px">
+          <span style="font-size:13px;color:var(--text3)">to</span>
+          <input type="date" id="statToDate" class="modal-input" style="margin-bottom:0;max-width:160px;padding:7px 10px">
+          <button class="btn sm primary" onclick="applyStatFilter()">Apply</button>
+          <button class="btn sm" onclick="clearStatFilter()">All Time</button>
+          <span id="statFilterLabel" style="font-size:12px;color:var(--accent);font-weight:600"></span>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-val" style="color:var(--accent)" id="statTotal">0</div></div>
+        <div class="stat-card"><div class="stat-label">Scanned Orders</div><div class="stat-val" style="color:var(--green)" id="statScanned">0</div></div>
+        <div class="stat-card"><div class="stat-label">Pending Orders</div><div class="stat-val" style="color:var(--amber)" id="statPending">0</div></div>
+        <div class="stat-card"><div class="stat-label">Errors</div><div class="stat-val" style="color:var(--red)" id="statErrors">0</div></div>
+        <div class="stat-card"><div class="stat-label">Total Value</div><div class="stat-val" style="color:var(--navy);font-size:20px" id="statTotalVal">—</div></div>
+        <div class="stat-card"><div class="stat-label">Scanned Value</div><div class="stat-val" style="color:var(--green);font-size:20px" id="statScannedVal">—</div></div>
+        <div class="stat-card"><div class="stat-label">Pending Value</div><div class="stat-val" style="color:var(--amber);font-size:20px" id="statPendingVal">—</div></div>
+      </div>
+      <div class="card mb-16">
+        <div class="card-title">Upload CSV / Excel File</div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+          <div style="font-size:40px;margin-bottom:12px">📂</div>
+          <div style="font-size:15px;color:var(--text2);margin-bottom:6px;font-weight:500">Click to upload or drag & drop</div>
+          <div style="font-size:12px;color:var(--text3)">CSV or XLSX · Columns: OrderID, UPC (+ optional: Product, Qty, Station)</div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple onchange="handleFile(event)">
+        <div id="uploadStatus" style="margin-top:12px"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">Import Status</div>
+        <div id="columnMapArea" style="color:var(--text3);font-size:13px">Upload a file to import orders.</div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--red)">Import Cancelled Orders</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:10px">Upload cancelled orders file — these orders will be removed from scanning queue (reset to pending so they won't appear as active).</div>
+        <div class="upload-zone" style="padding:20px;border-color:var(--red-light);background:var(--red-dim)" onclick="document.getElementById('cancelFileInput').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--red)'"
+          ondragleave="this.style.borderColor='var(--red-light)'" ondrop="handleCancelDrop(event)">
+          <div style="font-size:24px;margin-bottom:6px">🚫</div>
+          <div style="font-size:13px;color:var(--red);font-weight:500">Click to upload cancelled orders CSV/XLSX</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">File must have OrderID column</div>
+        </div>
+        <input type="file" id="cancelFileInput" accept=".csv,.xlsx,.xls" onchange="handleCancelFile(event)">
+        <div id="cancelUploadStatus" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div class="tab-panel" id="tabOrders">
+      <div class="stat-grid" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-label">Total Orders</div><div class="stat-val" style="color:var(--accent)" id="oStatTotal">0</div></div>
+        <div class="stat-card"><div class="stat-label">Complete</div><div class="stat-val" style="color:var(--green)" id="oStatDone">0</div></div>
+        <div class="stat-card"><div class="stat-label">In Progress</div><div class="stat-val" style="color:var(--amber)" id="oStatPartial">0</div></div>
+        <div class="stat-card"><div class="stat-label">Not Started</div><div class="stat-val" style="color:var(--text3)" id="oStatPending">0</div></div>
+        <div class="stat-card"><div class="stat-label">Errors</div><div class="stat-val" style="color:var(--red)" id="oStatError">0</div></div>
+      </div>
+      <div class="card" style="margin-bottom:20px;padding:16px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Overall Progress</span>
+          <span style="font-size:14px;font-weight:700;color:var(--green)" id="oProgLabel">0 / 0 complete</span>
+        </div>
+        <div class="prog-wrap" style="height:12px"><div class="prog-bar" style="background:var(--green)" id="oProgBar"></div></div>
+      </div>
+      <div class="flex-row mb-16">
+        <input class="order-search" id="orderSearch" placeholder="Search order ID, UPC, product..." oninput="renderOrders()">
+        <select class="order-search" id="filterStatus" style="max-width:180px" onchange="renderOrders()">
+          <option value="">ALL STATUS</option>
+          <option value="complete">COMPLETE</option>
+          <option value="partial">IN PROGRESS</option>
+          <option value="pending">NOT STARTED</option>
+          <option value="error">HAS ERRORS</option>
+        </select>
+        <button class="btn sm" id="detailToggleBtn" onclick="toggleDetail()">+ Show UPC Detail</button>
+        <button class="btn sm danger ml-auto" onclick="clearAllOrders()">Delete All</button>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:28px"></th><th>Order ID</th><th>Total UPCs</th><th>Scanned</th>
+              <th>Pending</th><th>Errors</th><th>Progress</th><th>Status</th><th>Station</th><th>Last Scan</th><th>Action</th>
+            </tr></thead>
+            <tbody id="ordersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATIONS TAB -->
+    <div class="tab-panel" id="tabStations">
+      <div class="stations-grid" id="stationsGrid"></div>
+      <div class="card" style="margin-top:20px">
+        <div style="display:flex;align-items:center;margin-bottom:14px">
+          <div class="card-title" style="margin-bottom:0">Completed Orders Log — All Stations</div>
+          <button class="btn sm danger ml-auto" onclick="clearAllLogs()">✕ Clear All Logs</button>
+        </div>
+        <div style="max-height:400px;overflow-y:auto" id="adminLogsList">
+          <div class="empty-state">No logs yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXPORT TAB -->
+    <div class="tab-panel" id="tabExport">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px">
+        <div class="card">
+          <div class="card-title">Date Wise Export</div>
+          <div style="display:grid;gap:10px">
+            <div>
+              <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:4px;text-transform:uppercase">From Date</label>
+              <input type="date" id="exportFrom" class="modal-input" style="margin-bottom:0">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:4px;text-transform:uppercase">To Date</label>
+              <input type="date" id="exportTo" class="modal-input" style="margin-bottom:0">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:4px;text-transform:uppercase">Status Filter</label>
+              <select id="exportStatusFilter" class="modal-input" style="margin-bottom:0">
+                <option value="all">ALL ORDERS</option>
+                <option value="complete">COMPLETE — All UPCs Scanned</option>
+                <option value="partial">PARTIAL — Partial Punch Used</option>
+                <option value="pending">PENDING — Not Started</option>
+              </select>
+            </div>
+            <button class="btn primary" onclick="exportDatewise()">⬇ Export Date Range (CSV)</button>
+            <div id="exportMsg" style="font-size:12px;color:var(--text3)"></div>
+          </div>
+          <div class="sep"></div>
+          <div class="card-title">Quick Export</div>
+          <div style="display:grid;gap:8px">
+            <button class="btn" onclick="exportByStatus('all')">⬇ All Orders</button>
+            <button class="btn success" onclick="exportByStatus('complete')">⬇ Complete Orders</button>
+            <button class="btn" style="border-color:var(--amber);color:var(--amber)" onclick="exportByStatus('partial')">⬇ Partial Orders</button>
+            <button class="btn" onclick="exportByStatus('pending')">⬇ Pending Orders</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Data & Reset</div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--text2)">
+            Orders and scan data are stored <strong>permanently in Firebase</strong> — no expiry.
+          </div>
+          <div class="card-title">Auto Cleanup</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <label style="font-size:12px;color:var(--text2);flex:1">Delete completed orders older than X days:</label>
+            <input type="number" id="retentionDays" min="1" max="365" value="30" style="width:70px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;outline:none;text-align:center">
+          </div>
+          <button class="btn" style="width:100%;margin-bottom:14px" onclick="cleanupOldOrders()">↺ Cleanup Old Orders</button>
+          <div class="sep"></div>
+          <div class="card-title">Manual Delete</div>
+          <div style="display:grid;gap:8px">
+            <button class="btn danger" onclick="deleteScannedOrders()">✕ Delete Scanned Orders</button>
+            <button class="btn danger" onclick="resetScanData()">↺ Reset Scan Data</button>
+            <button class="btn danger" onclick="clearAllLogs()">✕ Clear All Logs</button>
+            <button class="btn danger" onclick="clearAllOrders()">✕ Delete All Orders</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCANNER VIEW -->
+  <div class="view" id="scannerView">
+    <div class="scanner-view">
+
+      <!-- FIXED TOP — header + steps + camera -->
+      <div class="scanner-fixed-top">
+        <div class="scanner-header" style="padding:10px 16px;margin-bottom:8px;border-radius:12px;">
+          <div class="scanner-header-logo" style="width:34px;height:34px;font-size:15px">S</div>
+          <div>
+            <div style="font-size:10px;color:#90cdf4;letter-spacing:2px;font-weight:600">SSFR-DBS</div>
+            <div style="font-size:15px;font-weight:700" id="scannerTitle">STATION 1</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-size:22px;font-weight:800" id="scanCount">0</div>
+            <div style="font-size:10px;color:#90cdf4;letter-spacing:1px">COMPLETE</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div class="station-pulse pulse"></div>
+            <div style="font-size:10px;color:#90cdf4">LIVE</div>
+          </div>
+        </div>
+        <div id="noOrdersAlert" class="alert warn" style="display:none;margin-bottom:8px">No orders loaded. Ask admin to upload orders file.</div>
+        <div class="step-bar" style="margin-bottom:8px;">
+          <div class="step-item active" id="step1ind">① ORDER ID</div>
+          <div class="step-item" id="step2ind">② SCAN UPCs</div>
+          <div class="step-item" id="step3ind">③ COMPLETE</div>
+        </div>
+
+        <!-- CAMERA STRIP — fixed, always visible -->
+        <div id="camStrip" class="cam-strip">
+          <div class="cam-strip-video-wrap">
+            <video id="camVideo" autoplay playsinline muted></video>
+            <div class="cam-overlay">
+              <div class="cam-finder">
+                <div class="cam-scan-line"></div>
+                <div class="cam-finder-label">AIM BARCODE AT BOX</div>
+              </div>
+              <div class="cam-mode-badge" id="camModeBadge">ORDER ID</div>
+            </div>
+          </div>
+          <div class="cam-result-bar idle" id="camResultBar">Waiting for barcode...</div>
+          <div class="cam-controls">
+            <button class="cam-torch-btn" id="camTorchBtn" onclick="toggleTorch()" title="Torch">🔦</button>
+            <button class="cam-torch-btn" onclick="flipCamera()" title="Flip">🔄</button>
+            <button class="cam-stop-btn" onclick="stopCameraMode()">✕ Stop Camera</button>
+          </div>
+        </div>
+        <canvas id="camCanvas" style="display:none"></canvas>
+
+        <!-- START CAMERA BUTTON — only for Station 3 and 4 -->
+        <div id="camStartWrap" style="padding:0 0 6px 0;display:none;">
+          <button class="cam-start-btn" onclick="startCameraMode()">📷 Start Camera Scanner</button>
+        </div>
+      </div>
+
+      <!-- SCROLLABLE BODY -->
+
+        <!-- STEP 1 -->
+        <div class="scan-box fade-in" id="boxStep1">
+          <div class="card-title" style="margin-bottom:10px">Scan Order ID</div>
+          <div class="scan-input-wrap">
+            <span class="scan-icon">🔍</span>
+            <input class="scan-input" id="orderIdInput" type="text" placeholder="Scan Order ID barcode..." autocomplete="off" autofocus
+              onkeydown="if(event.key==='Enter'){event.preventDefault();processOrderId();}"
+              oninput="scheduleScan('orderIdInput',processOrderId)">
+          </div>
+          <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px;font-weight:500">SCAN BARCODE OR PRESS ENTER</div>
+          <div class="scan-result" id="orderIdResult"></div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div id="boxStep2" style="display:none">
+          <div class="active-order-panel" style="padding:10px 14px;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div><div style="font-size:10px;color:var(--text3);font-weight:600">ORDER ID</div><div style="font-size:16px;font-weight:800;color:var(--accent)" id="activeOrderId">—</div></div>
+              <div><div style="font-size:10px;color:var(--text3);font-weight:600">PRODUCT</div><div style="font-size:12px;color:var(--text)" id="activeProduct">—</div></div>
+              <div style="margin-left:auto;background:white;border-radius:8px;padding:6px 12px;box-shadow:var(--shadow);text-align:center">
+                <div style="font-size:10px;color:var(--text3);font-weight:600">PROGRESS</div>
+                <div style="font-size:18px;font-weight:800;color:var(--accent)" id="upcProgress">0/0</div>
+              </div>
+            </div>
+            <div style="margin-top:8px"><div class="prog-wrap" style="height:6px"><div class="prog-bar" style="background:var(--accent)" id="upcProgBar"></div></div></div>
+          </div>
+          <div class="card" style="margin-bottom:8px;padding:10px">
+            <div class="card-title" style="margin-bottom:6px">UPC Items</div>
+            <div id="upcItemsList"></div>
+          </div>
+          <div class="scan-box">
+            <div class="card-title" style="margin-bottom:10px">Scan UPC</div>
+            <div class="scan-input-wrap">
+              <span class="scan-icon">📦</span>
+              <input class="scan-input" id="upcInput" type="text" placeholder="Scan UPC barcode..." autocomplete="off"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();processUpc();}"
+                oninput="scheduleScan('upcInput',processUpc)">
+            </div>
+            <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:10px;font-weight:500">SCAN BARCODE OR PRESS ENTER</div>
+            <button class="btn amber-btn" id="partialPunchBtn" style="width:100%;font-size:13px;display:none;margin-bottom:8px;padding:10px" onclick="punchPartialOrder()">⚠ PUNCH PARTIAL ORDER</button>
+            <button class="btn danger" style="width:100%;font-size:12px" onclick="cancelOrder()">✕ Cancel / Wrong Order</button>
+            <div class="scan-result" id="upcResult"></div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div id="boxStep3" style="display:none">
+          <div class="complete-screen fade-in" style="padding:20px">
+            <div class="complete-check" style="width:56px;height:56px;font-size:26px">✓</div>
+            <div style="font-size:16px;font-weight:800;color:var(--green);margin-bottom:4px">ORDER COMPLETE!</div>
+            <div style="font-size:13px;color:var(--text2);font-weight:500" id="completeOrderId">—</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px" id="completeTime">—</div>
+            <div style="font-size:12px;color:var(--teal);margin-top:8px;font-weight:500">Scan next Order ID to continue...</div>
+          </div>
+          <div class="scan-input-wrap" style="margin-bottom:8px">
+            <span class="scan-icon">🔍</span>
+            <input class="scan-input" id="nextOrderInput" type="text" placeholder="Scan next Order ID..." autocomplete="off"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();processNextFromComplete();}"
+              oninput="scheduleScan('nextOrderInput',processNextFromComplete)">
+          </div>
+          <button class="btn primary" style="width:100%;padding:12px;font-size:14px;font-weight:600" onclick="nextOrder()">SCAN NEXT ORDER →</button>
+        </div>
+
+        <!-- Log - View Only -->
+        <div class="card" style="padding:10px">
+          <div class="card-title" style="margin-bottom:8px">Completed Orders Log</div>
+          <div class="scan-history" id="scanHistory"><div class="empty-state" style="padding:16px">No completed orders yet.</div></div>
+        </div>
+
+      </div><!-- end scanner-body -->
+    </div>
+  </div>
+</div>
+
+  <!-- VIEW ONLY -->
+  <div class="view" id="viewView">
+    <div style="max-width:700px;margin:0 auto;padding:20px">
+      <div style="background:linear-gradient(135deg,var(--navy),#2b6cb0);border-radius:16px;padding:20px 24px;margin-bottom:20px;color:#fff;display:flex;align-items:center;gap:16px">
+        <div style="width:44px;height:44px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px">👁️</div>
+        <div>
+          <div style="font-size:11px;color:#90cdf4;letter-spacing:2px;font-weight:600">SSFR-DBS</div>
+          <div style="font-size:18px;font-weight:700">Live Dashboard</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:11px;color:#90cdf4" id="viewLastUpdate">—</div>
+          <div style="font-size:11px;color:#68d391;margin-top:2px">● Live</div>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="card" style="margin-bottom:16px;padding:16px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px">Overall Progress</span>
+          <span style="font-size:14px;font-weight:700;color:var(--green)" id="vProgLabel">0 / 0</span>
+        </div>
+        <div class="prog-wrap" style="height:14px"><div class="prog-bar" style="background:var(--green)" id="vProgBar"></div></div>
+      </div>
+
+      <!-- 3 stat cards: Scanned, Pending, Partial with amounts -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div class="stat-card" style="border-left:4px solid var(--green)">
+          <div class="stat-label">Scanned</div>
+          <div class="stat-val" style="color:var(--green)" id="vStatScanned">0</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:4px" id="vAmtScanned">—</div>
+        </div>
+        <div class="stat-card" style="border-left:4px solid var(--amber)">
+          <div class="stat-label">Pending</div>
+          <div class="stat-val" style="color:var(--amber)" id="vStatPending">0</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:4px" id="vAmtPending">—</div>
+        </div>
+        <div class="stat-card" style="border-left:4px solid var(--purple)">
+          <div class="stat-label">Partial</div>
+          <div class="stat-val" style="color:var(--purple)" id="vStatPartial">0</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:4px" id="vAmtPartial">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- COLUMN MAP MODAL -->
+<div class="modal-bg" id="colMapModal">
+  <div class="modal">
+    <div class="modal-title">Map Your Columns</div>
+    <div id="colMapFields"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="applyMapping()">Apply →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FB_URL='https://scanr-warehouse-default-rtdb.firebaseio.com';
+const fb={
+  async get(path){try{const r=await fetch(`${FB_URL}${path}.json`);return r.ok?r.json():null;}catch{return null;}},
+  async set(path,data){try{const r=await fetch(`${FB_URL}${path}.json`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});return r.ok;}catch{return false;}},
+  async patch(path,data){try{const r=await fetch(`${FB_URL}${path}.json`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});return r.ok;}catch{return false;}},
+  async del(path){try{await fetch(`${FB_URL}${path}.json`,{method:'DELETE'});}catch{}},
+  listen(path,cb){
+    // Use polling instead of SSE for reliability
+    let lastData=null;
+    const poll=async()=>{
+      try{
+        const r=await fetch(`${FB_URL}${path}.json`);
+        if(!r.ok){setFbStatus(false);return;}
+        setFbStatus(true);
+        const data=await r.json();
+        const str=JSON.stringify(data);
+        if(str!==lastData){lastData=str;cb({data});}
+      }catch{setFbStatus(false);}
+    };
+    poll();
+    const id=setInterval(poll,5000);
+    return {close:()=>clearInterval(id)};
+  }
+};
+
+let role=null,stationId=null,localOrders={};
+let parsedHeaders=[],parsedRows=[],parsedCurrentFile='';
+let fileQueue=[],allImportResults=[];
+let activeOrderKey=null,activeUpcList=[],scanStep=1;
+let showUpcDetail=false;
+const ADMIN_PASS='admin123';
+const STATION_PASS={'1':'st1@ssfr','2':'st2@ssfr','3':'st3@ssfr','4':'st4@ssfr'};
+const scanTimers={};
+let stationHeartbeatTimer=null,ordersListener=null,stationsListener=null;
+const shownLogKeys=new Set();
+
+function setFbStatus(ok){const d=document.getElementById('fbDot'),l=document.getElementById('fbLabel');if(!d)return;d.className='fb-dot '+(ok?'ok':'err');l.textContent=ok?'Live':'Disconnected';}
+
+async function initSetup(){
+  const el=document.getElementById('fbStatus');
+  // Don't block — try in background
+  setTimeout(async()=>{
+    try{
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),6000);
+      const r=await fetch(`${FB_URL}/.json?shallow=true`,{signal:controller.signal});
+      clearTimeout(timer);
+      if(r.status===401||r.status===403){
+        el.innerHTML='<span style="color:orange">⚠ Firebase Rules not configured</span>';
+      } else if(r.ok||r.status===200){
+        el.innerHTML='<span style="color:var(--green)">✓ Firebase Connected</span>';
+      } else {
+        el.innerHTML='<span style="color:orange">⚠ Firebase: '+r.status+'</span>';
+      }
+    }catch(e){
+      el.innerHTML='<span style="color:orange">⚠ Firebase check failed — app works offline</span>';
+    }
+  },100);
+}
+initSetup();
+
+function selectRoleFromDropdown(r){
+  role=r;
+  const stWrap=document.getElementById('stationSelectWrap');
+  const stPass=document.getElementById('stationPassWrap');
+  const adPass=document.getElementById('adminPassWrap');
+  stWrap.style.display=r==='station'?'block':'none';
+  stPass.style.display=r==='station'?'block':'none';
+  adPass.style.display=r==='admin'?'block':'none';
+  // Auto focus password
+  if(r==='admin')setTimeout(()=>document.getElementById('adminPass').focus(),100);
+  if(r==='station')setTimeout(()=>document.getElementById('stationPass').focus(),100);
+}
+function selectRole(r){selectRoleFromDropdown(r);}
+
+async function enterApp(){
+  if(!role){alert('Select a role first.');return;}
+  if(role==='admin'){if(document.getElementById('adminPass').value!==ADMIN_PASS){alert('Wrong admin password!');return;}}
+  else if(role==='station'){
+    stationId=document.getElementById('stationSelect').value;
+    const pass=document.getElementById('stationPass').value;
+    if(pass!==STATION_PASS[stationId]){alert('Wrong password for Station '+stationId+'!');return;}
+  }
+  document.getElementById('setupScreen').style.display='none';
+  document.getElementById('mainApp').style.display='block';
+  document.getElementById('navAdmin').style.display='none';
+  document.getElementById('navScanner').style.display='none';
+
+  if(role==='view'){
+    document.getElementById('adminView').style.display='none';
+    document.getElementById('scannerView').style.display='none';
+    document.getElementById('viewView').style.display='';
+    showView('view');startViewListeners();return;
+  }
+  if(role==='admin'){
+    document.getElementById('navAdmin').style.display='inline-block';
+    document.getElementById('adminView').style.display='';
+    document.getElementById('scannerView').style.display='none';
+    showView('admin');startAdminListeners();
+  }else{
+    document.getElementById('navScanner').style.display='inline-block';
+    document.getElementById('adminView').style.display='none';
+    document.getElementById('scannerView').style.display='';
+    document.getElementById('scannerTitle').textContent='STATION '+stationId;
+    // Show camera button only for Station 3 and 4
+    const camWrap=document.getElementById('camStartWrap');
+    if(camWrap) camWrap.style.display=(stationId=='3'||stationId=='4')?'block':'none';
+    showView('scanner');startScannerListeners();startHeartbeat();
+  }
+}
+
+function logout(){
+  if(ordersListener){ordersListener.close();ordersListener=null;}
+  if(stationsListener){stationsListener.close();stationsListener=null;}
+  if(stationHeartbeatTimer)clearInterval(stationHeartbeatTimer);
+  role=null;stationId=null;localOrders={};
+  document.getElementById('navAdmin').style.display='none';
+  document.getElementById('navScanner').style.display='none';
+  document.getElementById('adminView').style.display='';
+  document.getElementById('scannerView').style.display='';
+  document.getElementById('viewView').style.display='none';
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById('setupScreen').style.display='flex';
+  document.getElementById('mainApp').style.display='none';
+  document.getElementById('adminPass').value='';
+  const rs=document.getElementById('roleSelect');if(rs)rs.value='';
+  const sw=document.getElementById('stationSelectWrap');if(sw)sw.style.display='none';
+  const sp=document.getElementById('stationPassWrap');if(sp)sp.style.display='none';
+  const ap=document.getElementById('adminPassWrap');if(ap)ap.style.display='none';
+}
+
+// FILE UPLOAD
+function handleDrop(e){e.preventDefault();document.getElementById('uploadZone').classList.remove('drag');const files=Array.from(e.dataTransfer.files).filter(f=>/\.(csv|xlsx|xls)$/i.test(f.name));if(files.length)processFileQueue(files);}
+function handleFile(e){const files=Array.from(e.target.files);if(files.length)processFileQueue(files);e.target.value='';}
+function processFileQueue(files){fileQueue=[...files];allImportResults=[];document.getElementById('uploadStatus').innerHTML=`<div class="alert info"><span class="spin">⟳</span> Loading ${fileQueue.length} file(s)...</div>`;processNextFile();}
+function processNextFile(){
+  if(fileQueue.length===0){
+    const ta=allImportResults.reduce((a,r)=>a+r.added,0),ts=allImportResults.reduce((a,r)=>a+r.skipped,0);
+    const lines=allImportResults.map(r=>`• ${r.name}: ${r.added} added${r.skipped?', '+r.skipped+' skipped':''}`).join('<br>');
+    const cls=ta>0?'success':'warn';
+    document.getElementById('uploadStatus').innerHTML=`<div class="alert ${cls}">✓ ${ta} orders uploaded to Firebase, ${ts} duplicates skipped.<br><small>${lines}</small></div>`;
+    document.getElementById('columnMapArea').innerHTML=`<div class="alert ${cls}" style="margin:0">Total in system: ${ordersArray().length} orders</div>`;
+    updateAdminStats();return;
+  }
+  processFile(fileQueue.shift());
+}
+function processFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      let data;
+      if(ext==='csv')data=parseCSV(e.target.result);
+      else{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const raw=XLSX.utils.sheet_to_json(ws,{header:1});data={headers:raw[0].map(String),rows:raw.slice(1).map(r=>raw[0].map((h,i)=>String(r[i]??'')))};}
+      parsedHeaders=data.headers;parsedRows=data.rows;autoImportFile(file.name);
+    }catch(err){document.getElementById('uploadStatus').innerHTML=`<div class="alert" style="background:var(--red-dim);border:1px solid var(--red-light);color:var(--red)">✕ Error in "${file.name}": ${err.message}</div>`;}
+  };
+  if(ext==='csv')reader.readAsText(file);else reader.readAsBinaryString(file);
+}
+function parseCSV(text){
+  const lines=text.trim().split('\n');
+  const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  const rows=lines.slice(1).map(l=>{const vals=[];let cur='';let inQ=false;for(const c of l){if(c==='"')inQ=!inQ;else if(c===','&&!inQ){vals.push(cur.trim());cur='';}else cur+=c;}vals.push(cur.trim());return vals;});
+  return{headers,rows};
+}
+function autoImportFile(filename){
+  const am=key=>parsedHeaders.find(h=>{const hl=h.toLowerCase();
+    if(key==='orderId'&&(hl.includes('order')||hl==='id'))return true;
+    if(key==='upc'&&(hl.includes('upc')||hl.includes('barcode')||hl.includes('sku')))return true;
+    if(key==='product'&&(hl.includes('product')||hl.includes('name')||hl.includes('item')))return true;
+    if(key==='qty'&&(hl.includes('qty')||hl.includes('quantity')))return true;
+    if(key==='station'&&hl.includes('station'))return true;
+    if(key==='subtotal'&&(hl.includes('subtotal')||hl.includes('value')||hl.includes('amount')||hl.includes('price')||hl.includes('total')))return true;
+    return false;})||'';
+  const mapped={orderId:am('orderId'),upc:am('upc'),product:am('product'),qty:am('qty'),station:am('station'),subtotal:am('subtotal')};
+  if(!mapped.orderId||!mapped.upc){parsedCurrentFile=filename;showColumnMapper();return;}
+  importWithMapping(filename,mapped);
+}
+async function importWithMapping(filename,mapping){
+  const hi=col=>col?parsedHeaders.indexOf(col):-1;
+  const newRows=parsedRows.filter(r=>r[hi(mapping.orderId)]).map(r=>({
+    orderId:String(r[hi(mapping.orderId)]||'').trim(),
+    upc:String(r[hi(mapping.upc)]||'').trim(),
+    product:mapping.product&&hi(mapping.product)>=0?String(r[hi(mapping.product)]||'').trim():'',
+    qty:mapping.qty&&hi(mapping.qty)>=0?String(r[hi(mapping.qty)]||'').trim():'1',
+    station:mapping.station&&hi(mapping.station)>=0?String(r[hi(mapping.station)]||'').trim():'',
+    subtotal:mapping.subtotal&&hi(mapping.subtotal)>=0?String(r[hi(mapping.subtotal)]||'').trim():'',
+    status:'pending',scannedAt:'',scannedBy:'',
+  })).filter(r=>r.orderId&&r.upc);
+  const existing=localOrders||{};
+  const existingKeys=new Set(Object.values(existing).map(o=>o.orderId+'|'+o.upc+'|'+(o.qty||'1')+'|'+(o.product||'')));
+  const toAdd={},skipped=[];
+  const baseIdx=Object.keys(existing).length;
+  newRows.forEach((r,i)=>{const key=r.orderId+'|'+r.upc+'|'+(r.qty||'1')+'|'+(r.product||'');if(existingKeys.has(key)){skipped.push(r);}else{toAdd[`order_${baseIdx+i}_${Date.now()}`]=r;existingKeys.add(key);}});
+  if(Object.keys(toAdd).length>0){await fb.patch('/orders',toAdd);Object.assign(localOrders,toAdd);}
+  allImportResults.push({name:filename,added:Object.keys(toAdd).length,skipped:skipped.length});
+  processNextFile();
+}
+function showColumnMapper(){
+  const fields=[
+    {key:'orderId',label:'Order ID *',required:true},
+    {key:'upc',label:'UPC / Barcode *',required:true},
+    {key:'product',label:'Product Name',required:false},
+    {key:'qty',label:'Quantity',required:false},
+    {key:'subtotal',label:'Subtotal / Value',required:false},
+    {key:'station',label:'Assigned Station',required:false}
+  ];
+  const am=key=>parsedHeaders.find(h=>{const hl=h.toLowerCase();
+    if(key==='orderId'&&(hl.includes('order')||hl==='id'))return true;
+    if(key==='upc'&&(hl.includes('upc')||hl.includes('barcode')||hl.includes('sku')))return true;
+    if(key==='product'&&(hl.includes('product')||hl.includes('name')||hl.includes('item')))return true;
+    if(key==='qty'&&(hl.includes('qty')||hl.includes('quantity')))return true;
+    if(key==='subtotal'&&(hl.includes('subtotal')||hl.includes('value')||hl.includes('amount')||hl.includes('price')||hl.includes('total')))return true;
+    if(key==='station'&&hl.includes('station'))return true;
+    return false;})||'';
+  document.getElementById('colMapFields').innerHTML=fields.map(f=>{const auto=am(f.key);return`<div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:4px;text-transform:uppercase">${f.label}</label><select class="modal-input" id="map_${f.key}" style="margin-bottom:0">${f.required?'':'<option value="">— Not mapped —</option>'}${parsedHeaders.map(h=>`<option value="${h}" ${h===auto?'selected':''}>${h}</option>`).join('')}</select></div>`;}).join('');
+  document.getElementById('colMapModal').classList.add('open');
+}
+function closeModal(){document.getElementById('colMapModal').classList.remove('open');}
+function applyMapping(){
+  const mapping={
+    orderId:document.getElementById('map_orderId').value,
+    upc:document.getElementById('map_upc').value,
+    product:document.getElementById('map_product').value,
+    qty:document.getElementById('map_qty').value,
+    subtotal:document.getElementById('map_subtotal').value,
+    station:document.getElementById('map_station').value
+  };
+  if(!mapping.orderId||!mapping.upc){alert('Order ID and UPC are required!');return;}
+  closeModal();importWithMapping(parsedCurrentFile||'file',mapping);
+}
+
+// ADMIN UI
+function startAdminListeners(){
+  const today=new Date().toISOString().split('T')[0];
+  const weekAgo=new Date(Date.now()-7*24*60*60*1000).toISOString().split('T')[0];
+  setTimeout(()=>{const f=document.getElementById('exportFrom'),t=document.getElementById('exportTo');if(f)f.value=weekAgo;if(t)t.value=today;},100);
+  ordersListener=fb.listen('/orders',({data})=>{localOrders=data||{};updateAdminStats();renderOrders();if(document.getElementById('tabStations').classList.contains('active'))renderStations();});
+  stationsListener=fb.listen('/stations',()=>{if(document.getElementById('tabStations').classList.contains('active'))renderStations();});
+  loadOrdersFromFb();
+}
+async function loadOrdersFromFb(){const data=await fb.get('/orders');localOrders=data||{};updateAdminStats();renderOrders();}
+
+function ordersArray(){return Object.values(localOrders||{});}
+let statFilterFrom=null,statFilterTo=null;
+function applyStatFilter(){
+  const f=document.getElementById('statFromDate').value;
+  const t=document.getElementById('statToDate').value;
+  if(!f||!t){alert('Select both dates');return;}
+  // Use date strings directly for comparison (YYYY-MM-DD)
+  statFilterFrom=f;
+  statFilterTo=t;
+  document.getElementById('statFilterLabel').textContent='Showing: '+f+' to '+t;
+  updateAdminStats();
+}
+function clearStatFilter(){
+  statFilterFrom=null;statFilterTo=null;
+  document.getElementById('statFilterLabel').textContent='All Time';
+  document.getElementById('statFromDate').value='';
+  document.getElementById('statToDate').value='';
+  updateAdminStats();
+}
+// Extract YYYY-MM-DD from scannedAt locale string like "5/29/2026, 11:41:18 AM"
+function getScanDateStr(scannedAt){
+  if(!scannedAt)return null;
+  try{
+    const d=new Date(scannedAt);
+    if(isNaN(d))return null;
+    const y=d.getFullYear();
+    const m=String(d.getMonth()+1).padStart(2,'0');
+    const day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }catch{return null;}
+}
+function updateAdminStats(){
+  const all=ordersArray();
+  const fmt=n=>n>0?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+  const parseVal=o=>{const v=parseFloat((o.subtotal||'').toString().replace(/[^0-9.]/g,''));return isNaN(v)?0:v;};
+
+  // All-time counts (never filtered)
+  const uniqueTotal=new Set(all.map(o=>o.orderId)).size;
+  const uniquePending=new Set(all.filter(o=>o.status==='pending').map(o=>o.orderId)).size;
+  const uniqueErrors=new Set(all.filter(o=>o.status==='error').map(o=>o.orderId)).size;
+
+  // Scanned pool — filter by SCAN date only
+  let scannedPool=all.filter(o=>o.status==='scanned');
+  if(statFilterFrom&&statFilterTo){
+    scannedPool=scannedPool.filter(o=>{
+      const ds=getScanDateStr(o.scannedAt);
+      return ds&&ds>=statFilterFrom&&ds<=statFilterTo;
+    });
+  }
+  const uniqueScanned=new Set(scannedPool.map(o=>o.orderId)).size;
+
+  // When filter active — Total shows scanned in range, not all-time
+  document.getElementById('statTotal').textContent=statFilterFrom?uniqueScanned:uniqueTotal;
+  document.getElementById('statScanned').textContent=uniqueScanned;
+  document.getElementById('statPending').textContent=uniquePending;
+  document.getElementById('statErrors').textContent=uniqueErrors;
+
+  // Update stat labels based on filter
+  const totalLabel=document.querySelector('#statTotal')?.closest('.stat-card')?.querySelector('.stat-label');
+  if(totalLabel) totalLabel.textContent=statFilterFrom?'Scanned (Date Range)':'Total Orders';
+
+  // Values
+  const totalVal=statFilterFrom
+    ? scannedPool.reduce((a,o)=>a+parseVal(o),0)
+    : all.reduce((a,o)=>a+parseVal(o),0);
+  const scannedVal=scannedPool.reduce((a,o)=>a+parseVal(o),0);
+  const pendingVal=all.filter(o=>o.status==='pending').reduce((a,o)=>a+parseVal(o),0);
+  document.getElementById('statTotalVal').textContent=fmt(totalVal);
+  document.getElementById('statScannedVal').textContent=fmt(scannedVal);
+  document.getElementById('statPendingVal').textContent=fmt(pendingVal);
+}
+function buildOrderGroups(){
+  const map={};
+  ordersArray().forEach(o=>{if(!map[o.orderId])map[o.orderId]={orderId:o.orderId,rows:[]};map[o.orderId].rows.push(o);});
+  return Object.values(map).map(g=>{
+    const tq=g.rows.reduce((a,r)=>a+(parseInt(r.qty)||1),0);
+    const sc=g.rows.filter(r=>r.status==='scanned').length;
+    const er=g.rows.filter(r=>r.status==='error').length;
+    const allDone=g.rows.every(r=>r.status==='scanned');
+    const started=sc>0||er>0;
+    const os=allDone?'complete':er>0?'error':started?'partial':'pending';
+    const ls=g.rows.filter(r=>r.scannedAt).map(r=>r.scannedAt).sort().pop()||'';
+    const st=g.rows.find(r=>r.scannedBy)?.scannedBy||g.rows[0].station||'';
+    const pct=tq>0?Math.round(sc/tq*100):0;
+    return{...g,totalQty:tq,scanned:sc,errors:er,pending:g.rows.filter(r=>r.status==='pending').length,orderStatus:os,lastScan:ls,station:st,pct};
+  });
+}
+function renderOrders(){
+  const groups=buildOrderGroups();
+  const search=document.getElementById('orderSearch').value.toLowerCase();
+  const filterSt=document.getElementById('filterStatus').value;
+  const total=groups.length,done=groups.filter(g=>g.orderStatus==='complete').length;
+  document.getElementById('oStatTotal').textContent=total;
+  document.getElementById('oStatDone').textContent=done;
+  document.getElementById('oStatPartial').textContent=groups.filter(g=>g.orderStatus==='partial').length;
+  document.getElementById('oStatPending').textContent=groups.filter(g=>g.orderStatus==='pending').length;
+  document.getElementById('oStatError').textContent=groups.filter(g=>g.orderStatus==='error').length;
+  const pct=total>0?Math.round(done/total*100):0;
+  document.getElementById('oProgBar').style.width=pct+'%';
+  document.getElementById('oProgLabel').textContent=done+' / '+total+' orders complete ('+pct+'%)';
+  const filtered=groups.filter(g=>{const ms=!search||g.orderId.toLowerCase().includes(search)||g.rows.some(r=>r.upc.toLowerCase().includes(search)||(r.product||'').toLowerCase().includes(search));const mf=!filterSt||g.orderStatus===filterSt;return ms&&mf;});
+  const tbody=document.getElementById('ordersBody');
+  if(!filtered.length){tbody.innerHTML=`<tr><td colspan="11" class="empty-state">No orders found.</td></tr>`;return;}
+  const sb=s=>{const m={complete:['complete','COMPLETE'],partial:['partial','IN PROGRESS'],pending:['pending','PENDING'],error:['error','HAS ERRORS']};const[c,l]=m[s]||['pending','PENDING'];return`<span class="badge ${c}">${l}</span>`;};
+  let html='';
+  filtered.forEach(g=>{
+    const bc=g.orderStatus==='complete'?'var(--green)':g.orderStatus==='error'?'var(--red)':'var(--amber)';
+    html+=`<tr style="cursor:pointer" onclick="this.nextElementSibling.classList.toggle('hidden-row')">
+      <td style="text-align:center;color:var(--text3)">▸</td>
+      <td style="color:var(--accent);font-weight:700">${g.orderId}</td>
+      <td>${g.totalQty}</td><td style="color:var(--green);font-weight:700">${g.scanned}</td>
+      <td style="color:var(--amber)">${g.pending}</td>
+      <td style="color:${g.errors>0?'var(--red)':'var(--text3)'}">${g.errors||'—'}</td>
+      <td style="min-width:120px"><div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;background:var(--surface3);border-radius:999px;height:6px;overflow:hidden"><div style="height:100%;width:${g.pct}%;background:${bc};border-radius:999px;transition:width .3s"></div></div>
+        <span style="font-size:11px;color:var(--text3);min-width:32px">${g.pct}%</span></div></td>
+      <td>${sb(g.orderStatus)}</td>
+      <td style="color:var(--text3);font-size:12px">${g.station?'S'+g.station:'—'}</td>
+      <td style="color:var(--text3);font-size:11px">${g.lastScan||'—'}</td>
+      <td onclick="event.stopPropagation()"><button onclick="deleteOrder('${g.orderId}')" class="btn sm danger" style="padding:3px 10px;font-size:11px">↺ Reset</button></td>
+    </tr>
+    <tr class="${showUpcDetail?'':'hidden-row'}" style="background:var(--surface2)">
+      <td></td><td colspan="10" style="padding:0 0 0 12px">
+        <table style="width:100%;margin:6px 0">
+          <thead><tr><th style="font-size:10px;padding:4px 8px;background:transparent;color:var(--text3)">UPC</th><th style="font-size:10px;padding:4px 8px;background:transparent;color:var(--text3)">PRODUCT</th><th style="font-size:10px;padding:4px 8px;background:transparent;color:var(--text3)">QTY</th><th style="font-size:10px;padding:4px 8px;background:transparent;color:var(--text3)">STATUS</th><th style="font-size:10px;padding:4px 8px;background:transparent;color:var(--text3)">SCANNED AT</th></tr></thead>
+          <tbody>${g.rows.map(r=>`<tr><td style="font-family:monospace;color:var(--teal);font-size:12px;padding:4px 8px">${r.upc}</td><td style="font-size:12px;padding:4px 8px">${r.product||'—'}</td><td style="font-size:12px;padding:4px 8px">${r.qty||1}</td><td style="padding:4px 8px"><span class="badge ${r.status}" style="font-size:10px;padding:2px 8px">${r.status.toUpperCase()}</span></td><td style="color:var(--text3);font-size:11px;padding:4px 8px">${r.scannedAt||'—'}</td></tr>`).join('')}</tbody>
+        </table></td>
+    </tr>`;
+  });
+  tbody.innerHTML=html;
+}
+async function deleteOrder(orderId){
+  if(!confirm('Reset order "'+orderId+'" ? It will go back to pending and can be scanned again.'))return;
+  // Reset all rows of this order back to pending
+  const toReset=Object.entries(localOrders).filter(([k,o])=>o.orderId===orderId);
+  for(const[k,o]of toReset){
+    const updated={...o,status:'pending',scannedAt:'',scannedBy:'',partial:false};
+    await fb.patch('/orders/'+k,updated);
+    localOrders[k]=updated;
+  }
+  // Release lock
+  await fb.del('/locks/'+orderId);
+  updateAdminStats();renderOrders();
+}
+async function renderStations(){
+  const orders=ordersArray();const stationsData=await fb.get('/stations')||{};const now=Date.now();
+  document.getElementById('stationsGrid').innerHTML=[1,2,3,4].map(id=>{
+    const stSc=new Set(orders.filter(o=>o.scannedBy==id&&o.status==='scanned').map(o=>o.orderId)).size;
+    const stEr=orders.filter(o=>o.scannedBy==id&&o.status==='error').length;
+    const lastSeen=stationsData[id];const isOnline=lastSeen&&(now-lastSeen)<12000;
+    const totalOrders=new Set(orders.map(o=>o.orderId)).size;
+    const pct=totalOrders>0?Math.round(stSc/totalOrders*100):0;
+    return`<div class="station-card ${isOnline?'active-station':''}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div class="station-dot ${isOnline?'online pulse':''}"></div>
+        <span style="font-size:14px;font-weight:700;color:var(--navy)">Station ${id}</span>
+        <span style="margin-left:auto;font-size:12px;font-weight:600">${isOnline?'<span style="color:var(--green)">● Online</span>':'<span style="color:var(--text3)">○ Offline</span>'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="background:var(--green-dim);border:1px solid var(--green-light);border-radius:8px;padding:10px;text-align:center"><div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:2px">SCANNED</div><div style="font-size:22px;font-weight:800;color:var(--green)">${stSc}</div></div>
+        <div style="background:var(--red-dim);border:1px solid var(--red-light);border-radius:8px;padding:10px;text-align:center"><div style="font-size:11px;color:var(--red);font-weight:600;margin-bottom:2px">ERRORS</div><div style="font-size:22px;font-weight:800;color:var(--red)">${stEr}</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:6px;font-weight:500">Progress: ${stSc} / ${totalOrders} orders (${pct}%)</div>
+      <div class="prog-wrap"><div class="prog-bar" style="background:${pct>80?'var(--green)':'var(--accent)'};width:${pct}%"></div></div>
+      ${lastSeen?`<div style="font-size:11px;color:var(--text3);margin-top:8px">Last active: ${new Date(lastSeen).toLocaleTimeString()}</div>`:''}
+    </div>`;
+  }).join('');
+  // Load logs for admin
+  const logs=await fb.get('/logs');
+  const logEl=document.getElementById('adminLogsList');
+  if(!logs||!logEl)return;
+  const sorted=Object.entries(logs).sort((a,b)=>(b[1].timestamp||0)-(a[1].timestamp||0)).slice(0,100);
+  if(!sorted.length){logEl.innerHTML='<div class="empty-state">No logs yet.</div>';return;}
+  logEl.innerHTML=sorted.map(([k,l])=>`
+    <div class="scan-log-item">
+      <span style="color:var(--green);font-size:16px">✓</span>
+      <span style="color:var(--green);font-weight:700;min-width:130px;font-size:13px">${l.orderId}</span>
+      <span style="color:var(--text2);flex:1;font-size:12px">${l.totalUpcs||0} UPC · ${l.totalQty||0} items</span>
+      <span style="color:var(--accent);font-size:11px;font-weight:600;margin-right:8px">Station ${l.stationId}</span>
+      <span style="color:var(--text3);font-size:11px">${l.completedAt||''}</span>
+    </div>`).join('');
+}
+
+// DELETE / RESET
+async function deleteScannedOrders(){const sc=Object.entries(localOrders).filter(([k,o])=>o.status==='scanned');if(!sc.length){alert('No scanned orders found.');return;}if(!confirm(`Delete ${sc.length} scanned orders? This cannot be undone.`))return;for(const[k]of sc){await fb.del('/orders/'+k);delete localOrders[k];}updateAdminStats();renderOrders();alert(`✓ ${sc.length} orders deleted.`);}
+async function clearAllOrders(){if(!confirm('DELETE ALL orders? Cannot be undone.'))return;await fb.del('/orders');localOrders={};updateAdminStats();renderOrders();}
+async function resetScanData(){
+  if(!confirm('Reset all scan data? Orders will remain but scan status and logs will be cleared.'))return;
+  const updated={};
+  Object.entries(localOrders).forEach(([k,o])=>{updated[k]={...o,status:'pending',scannedAt:'',scannedBy:'',partial:false};});
+  await fb.set('/orders',updated);
+  localOrders=updated;
+  // Also clear logs and locks so station logs reset too
+  await fb.del('/logs');
+  await fb.del('/locks');
+  updateAdminStats();renderOrders();
+  alert('✓ Scan data and station logs cleared.');
+}
+async function clearAllLogs(){
+  if(!confirm('Clear ALL station logs?'))return;
+  await fb.del('/logs');
+  // Real-time clear admin log UI
+  const logEl=document.getElementById('adminLogsList');
+  if(logEl)logEl.innerHTML='<div class="empty-state">No logs yet.</div>';
+  alert('✓ All logs cleared.');
+}
+async function cleanupOldOrders(){const days=parseInt(document.getElementById('retentionDays').value)||30;const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);const toDelete=Object.entries(localOrders).filter(([k,o])=>o.status==='scanned'&&o.scannedAt&&new Date(o.scannedAt)<cutoff);if(!toDelete.length){alert(`No completed orders older than ${days} days found.`);return;}if(!confirm(`Delete ${toDelete.length} orders older than ${days} days? Cannot be undone.`))return;for(const[k]of toDelete){await fb.del('/orders/'+k);delete localOrders[k];}updateAdminStats();renderOrders();alert(`✓ ${toDelete.length} orders deleted.`);}
+
+// EXPORT
+// Order-level status
+function getOrderStatus(rows){
+  const allScanned=rows.every(r=>r.status==='scanned');
+  const noneScanned=rows.every(r=>r.status==='pending');
+  const anyPartial=rows.some(r=>r.partial===true);
+  if(noneScanned) return 'Pending';
+  if(allScanned&&anyPartial) return 'Partial Order';
+  if(allScanned&&!anyPartial) return 'Complete Order';
+  return 'Partial Order';
+}
+function getStation(r){
+  if(r.scannedBy) return 'Station '+r.scannedBy;
+  if(r.station) return 'Station '+r.station;
+  return '';
+}
+function groupByOrder(){
+  const orders=ordersArray();
+  const groups={};
+  orders.forEach(o=>{if(!groups[o.orderId])groups[o.orderId]=[];groups[o.orderId].push(o);});
+  return groups;
+}
+const STATUS_SORT={'Complete Order':1,'Partial Order':2,'Pending':3};
+function buildRows(groups,sf,fd,td){
+  // Build array of {orderId, rows, os} then sort by os then orderId
+  const orderList=[];
+  Object.keys(groups).forEach(orderId=>{
+    const rows=groups[orderId];
+    const os=getOrderStatus(rows);
+    if(sf==='complete'&&os!=='Complete Order') return;
+    if(sf==='partial'&&os!=='Partial Order') return;
+    if(sf==='pending'&&os!=='Pending') return;
+    if(fd&&td){
+      const inRange=rows.some(r=>{if(!r.scannedAt)return sf==='all'||sf==='pending';const d=new Date(r.scannedAt);return d>=fd&&d<=td;});
+      if(!inRange&&sf!=='pending') return;
+    }
+    orderList.push({orderId,rows,os});
+  });
+  // Sort: first by order status (Complete > Partial > Pending), then by orderId
+  orderList.sort((a,b)=>{
+    const sd=(STATUS_SORT[a.os]||9)-(STATUS_SORT[b.os]||9);
+    if(sd!==0) return sd;
+    return a.orderId.localeCompare(b.orderId);
+  });
+  const result=[];
+  orderList.forEach(({rows,os})=>{
+    rows.forEach(r=>{
+    // Scan Qty: actually scanned = real qty, force-completed (partial:true) = 0
+    const scanQty = r.partial===true ? 0 : (parseInt(r.qty)||1);
+    result.push([r.orderId,r.upc,r.product||'',scanQty,getStation(r),os,r.scannedAt||'']);
+    });
+  });
+  return result;
+}
+const EXPORT_H=['OrderID','UPC','Product','Scan Qty','Station','Order Status','Scanned At'];
+function exportByStatus(filter){
+  const rows=buildRows(groupByOrder(),filter,null,null);
+  if(!rows.length){alert('No orders found.');return;}
+  dlCSV(EXPORT_H,rows,`scanr_${filter}_${Date.now()}.csv`);
+}
+function exportDatewise(){
+  const from=document.getElementById('exportFrom').value,to=document.getElementById('exportTo').value;
+  const sf=document.getElementById('exportStatusFilter').value,msgEl=document.getElementById('exportMsg');
+  if(!from||!to){msgEl.style.color='var(--red)';msgEl.textContent='Select both dates';return;}
+  if(from>to){msgEl.style.color='var(--red)';msgEl.textContent='From date must be before To date';return;}
+  const fd=new Date(from);fd.setHours(0,0,0,0);
+  const td=new Date(to);td.setHours(23,59,59,999);
+  const rows=buildRows(groupByOrder(),sf,fd,td);
+  if(!rows.length){msgEl.style.color='var(--amber)';msgEl.textContent='No orders in this range';return;}
+  dlCSV(EXPORT_H,rows,`scanr_${from}_to_${to}_${sf}.csv`);
+  msgEl.style.color='var(--green)';msgEl.textContent=`✓ ${rows.length} rows exported`;
+}
+function dlCSV(headers,rows,filename){
+  const csv=[headers,...rows].map(r=>r.map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=filename;a.click();
+}
+function downloadCSV(orders,filename){
+  const groups={};
+  orders.forEach(o=>{if(!groups[o.orderId])groups[o.orderId]=[];groups[o.orderId].push(o);});
+  dlCSV(EXPORT_H,buildRows(groups,'all',null,null),filename);
+}
+
+// SCANNER
+function startScannerListeners(){
+  ordersListener=fb.listen('/orders',({data})=>{localOrders=data||{};updateScannerCount();});
+  fb.get('/orders').then(data=>{localOrders=data||{};updateScannerCount();});
+  loadCompletedLogs();
+}
+function startHeartbeat(){const beat=()=>fb.patch('/stations',{[stationId]:Date.now()});beat();stationHeartbeatTimer=setInterval(beat,5000);}
+function updateScannerCount(){
+  const orders=ordersArray();
+  // Count unique orderIds where ALL rows for that order are scanned
+  const orderIds=[...new Set(orders.map(o=>o.orderId))];
+  const completedOrders=orderIds.filter(id=>{
+    const rows=orders.filter(o=>o.orderId===id);
+    return rows.length>0&&rows.every(o=>o.status==='scanned');
+  });
+  document.getElementById('scanCount').textContent=completedOrders.length;
+  const el=document.getElementById('noOrdersAlert');if(el)el.style.display=orders.length===0?'block':'none';
+}
+
+// STEP 1
+async function processOrderId(){
+  clearTimeout(scanTimers['orderIdInput']);
+  const input=document.getElementById('orderIdInput');
+  const val=input.value.trim();if(!val)return;input.value='';
+  const resultEl=document.getElementById('orderIdResult');
+  // Use local data (polled every 3s) - no blocking fetch
+  const orders=ordersArray();
+  const orderRows=orders.filter(o=>o.orderId===val);
+  if(!orderRows.length){playBeep('error');resultEl.className='scan-result show fail';resultEl.textContent='✕ Order Not Found: '+val;if(!camActive)input.focus();return;}
+  const assigned=orderRows[0].station;
+  if(assigned&&assigned!=stationId){resultEl.className='scan-result show fail';resultEl.textContent='✕ Wrong Station! Assigned to Station '+assigned;if(!camActive)input.focus();return;}
+  if(orderRows.every(o=>o.status==='scanned')){resultEl.className='scan-result show duplicate';resultEl.textContent='⚠ Order Already Complete: '+val;if(!camActive)input.focus();return;}
+  fb.set('/locks/'+val,{stationId,timestamp:Date.now(),orderId:val}); // non-blocking
+  const fbKeys=Object.keys(localOrders);
+  const upcMap={};
+  orderRows.forEach(o=>{
+    if(!upcMap[o.upc])upcMap[o.upc]={upc:o.upc,product:o.product||'',qty:0,scannedCount:0,fbKey:null};
+    const rowQty=parseInt(o.qty)||1;
+    upcMap[o.upc].qty+=rowQty;
+    if(o.status==='scanned'){
+      upcMap[o.upc].scannedCount+=rowQty;
+    } else {
+      const k=fbKeys.find(k=>localOrders[k].orderId===o.orderId&&localOrders[k].upc===o.upc&&localOrders[k].status!=='scanned');
+      if(k) upcMap[o.upc].fbKey=k;
+    }
+  });
+  activeUpcList=Object.values(upcMap);activeOrderKey=val;
+  goToStep(2);renderUpcItems();
+  if(!camActive)setTimeout(()=>document.getElementById('upcInput').focus(),100);
+}
+
+// STEP 2
+async function processUpc(){
+  clearTimeout(scanTimers['upcInput']);
+  const input=document.getElementById('upcInput');
+  const val=input.value.trim();if(!val)return;input.value='';
+  const resultEl=document.getElementById('upcResult');
+  const upcEntry=activeUpcList.find(u=>u.upc===val);
+  if(!upcEntry){
+    resultEl.className='scan-result show fail';
+    playBeep('error');resultEl.textContent='✕ UPC Not In This Order: '+val;
+    if(!camActive)input.focus();setTimeout(()=>resultEl.className='scan-result',2500);return;
+  }
+  if(upcEntry.scannedCount>=upcEntry.qty){
+    resultEl.className='scan-result show duplicate';
+    resultEl.textContent='⚠ UPC Fully Scanned ('+upcEntry.qty+'/'+upcEntry.qty+') — Duplicate!';
+    if(!camActive)input.focus();setTimeout(()=>resultEl.className='scan-result',2500);return;
+  }
+  upcEntry.scannedCount++;
+  playBeep('success');
+  if(upcEntry.scannedCount>=upcEntry.qty){
+    const fbKey=Object.entries(localOrders).find(([k,o])=>
+      o.orderId===activeOrderKey&&o.upc===val&&o.status!=='scanned'
+    )?.[0] || upcEntry.fbKey;
+    if(fbKey){
+      const updated={status:'scanned',scannedBy:stationId,scannedAt:new Date().toLocaleString()};
+      if(localOrders[fbKey]) Object.assign(localOrders[fbKey],updated);
+      fb.patch('/orders/'+fbKey,updated); // fire and forget - no await
+    }
+  }
+  const remaining=upcEntry.qty-upcEntry.scannedCount;
+  resultEl.className='scan-result show success';
+  resultEl.textContent=remaining>0
+    ?'✓ '+upcEntry.scannedCount+'/'+upcEntry.qty+' scanned'+(upcEntry.product?' — '+upcEntry.product:'')
+    :'✓ UPC Complete! '+(upcEntry.product||upcEntry.upc);
+  if(!camActive)input.focus();
+  renderUpcItems();
+  setTimeout(()=>resultEl.className='scan-result',2000);
+  if(activeUpcList.every(u=>u.scannedCount>=u.qty))setTimeout(()=>completeOrder(),800);
+}
+
+function renderUpcItems(){
+  const ts=activeUpcList.reduce((a,u)=>a+u.scannedCount,0);
+  const tq=activeUpcList.reduce((a,u)=>a+u.qty,0);
+  document.getElementById('activeOrderId').textContent=activeOrderKey;
+  document.getElementById('activeProduct').textContent=activeUpcList.length===1?(activeUpcList[0].product||'—'):activeUpcList.length+' items';
+  document.getElementById('upcProgress').textContent=ts+'/'+tq;
+  document.getElementById('upcProgBar').style.width=(tq>0?Math.round(ts/tq*100):0)+'%';
+  // Show partial punch button if SOME but NOT ALL scanned
+  const partialBtn=document.getElementById('partialPunchBtn');
+  if(partialBtn){const isPartial=ts>0&&ts<tq;partialBtn.style.display=isPartial?'block':'none';}
+  document.getElementById('upcItemsList').innerHTML=activeUpcList.map(u=>{
+    const done=u.scannedCount>=u.qty,partial=u.scannedCount>0&&!done;
+    const color=done?'var(--green)':partial?'var(--amber)':'var(--text3)';
+    const bg=done?'var(--green-dim)':partial?'var(--amber-dim)':'transparent';
+    return`<div style="display:flex;align-items:center;gap:12px;padding:10px;margin-bottom:4px;border-radius:8px;background:${bg}">
+      <span style="font-size:18px;color:${color};width:22px;text-align:center">${done?'✓':partial?'◑':'○'}</span>
+      <span style="font-family:monospace;color:var(--teal);min-width:130px;font-size:13px;font-weight:600">${u.upc}</span>
+      <span style="flex:1;font-size:13px;color:var(--text2)">${u.product||'—'}</span>
+      <span style="font-size:14px;font-weight:700;color:${color};background:white;padding:4px 10px;border-radius:6px;box-shadow:var(--shadow)">${u.scannedCount}/${u.qty}</span>
+    </div>`;
+  }).join('');
+}
+
+async function punchPartialOrder(){
+  const ts=activeUpcList.reduce((a,u)=>a+u.scannedCount,0);
+  const tq=activeUpcList.reduce((a,u)=>a+u.qty,0);
+  const remaining=tq-ts;
+  if(!confirm(`${remaining} item(s) are incomplete.\nMark order as complete anyway?`))return;
+  for(const upc of activeUpcList){
+    const pendingRows=Object.entries(localOrders).filter(([k,o])=>o.orderId===activeOrderKey&&o.upc===upc.upc&&o.status!=='scanned');
+    for(const[fbKey] of pendingRows){const updated={status:'scanned',scannedBy:stationId,scannedAt:new Date().toLocaleString(),partial:true};Object.assign(localOrders[fbKey],updated);fb.patch('/orders/'+fbKey,updated);}
+    upc.scannedCount=upc.qty;
+  }
+  completeOrder();
+}
+
+function completeOrder(){
+  goToStep(3);
+  document.getElementById('completeOrderId').textContent='Order: '+activeOrderKey;
+  document.getElementById('completeTime').textContent='Completed at '+new Date().toLocaleString();
+  addCompletedLog(activeOrderKey);updateScannerCount();
+  if(activeOrderKey)fb.del('/locks/'+activeOrderKey);
+  setTimeout(()=>document.getElementById('nextOrderInput').focus(),100);
+}
+function processNextFromComplete(){clearTimeout(scanTimers['nextOrderInput']);const input=document.getElementById('nextOrderInput');const val=input.value.trim();input.value='';activeOrderKey=null;activeUpcList=[];goToStep(1);if(val){document.getElementById('orderIdInput').value=val;processOrderId();}else{setTimeout(()=>document.getElementById('orderIdInput').focus(),100);}}
+function cancelOrder(){if(!confirm('Cancel scanning for Order '+activeOrderKey+'? Progress will be saved.'))return;if(activeOrderKey)fb.del('/locks/'+activeOrderKey);activeOrderKey=null;activeUpcList=[];goToStep(1);}
+function nextOrder(){if(activeOrderKey)fb.del('/locks/'+activeOrderKey);activeOrderKey=null;activeUpcList=[];goToStep(1);document.getElementById('orderIdInput').value='';document.getElementById('orderIdResult').className='scan-result';setTimeout(()=>document.getElementById('orderIdInput').focus(),100);}
+
+async function addCompletedLog(orderId){
+  const totalQty=activeUpcList.reduce((a,u)=>a+u.qty,0),totalUpcs=activeUpcList.length;
+  const logKey='log_'+Date.now()+'_s'+stationId;
+  const logEntry={orderId,stationId,totalQty,totalUpcs,completedAt:new Date().toLocaleString(),timestamp:Date.now()};
+  fb.patch('/logs',{[logKey]:logEntry}); // fire and forget
+  shownLogKeys.add(logKey);
+  addLogToUI(logEntry);
+}
+function addLogToUI(log){
+  const h=document.getElementById('scanHistory');if(!h)return;
+  const first=h.querySelector('.empty-state');if(first)first.remove();
+  const item=document.createElement('div');item.className='scan-log-item';
+  item.innerHTML=`<span style="color:var(--green);font-size:16px">✓</span><span style="color:var(--green);font-weight:700;min-width:130px;font-size:13px">${log.orderId}</span><span style="color:var(--text2);flex:1;font-size:12px">${log.totalUpcs} UPC · ${log.totalQty} items</span><span style="color:var(--accent);font-size:11px;font-weight:600;margin-right:6px">S${log.stationId}</span><span style="color:var(--text3);font-size:11px">${log.completedAt||''}</span>`;
+  h.insertBefore(item,h.firstChild);
+}
+async function loadCompletedLogs(){
+  const logs=await fb.get('/logs');if(!logs)return;
+  const sorted=Object.entries(logs).sort((a,b)=>(b[1].timestamp||0)-(a[1].timestamp||0));
+  const mine=sorted.filter(([k,l])=>l.stationId==stationId).slice(0,50);
+  if(!mine.length)return;
+  const h=document.getElementById('scanHistory');if(!h)return;
+  const first=h.querySelector('.empty-state');if(first)first.remove();
+  mine.forEach(([k,log])=>{if(!shownLogKeys.has(k)){shownLogKeys.add(k);addLogToUI(log);}});
+}
+async function clearMyLogs(){if(!confirm('Clear your completed orders log?'))return;const logs=await fb.get('/logs');if(logs){for(const[k,l]of Object.entries(logs)){if(l.stationId==stationId)await fb.del('/logs/'+k);}}shownLogKeys.clear();const h=document.getElementById('scanHistory');if(h)h.innerHTML='<div class="empty-state" style="padding:16px">No completed orders yet.</div>';}
+
+function goToStep(step){
+  scanStep=step;
+  document.getElementById('boxStep1').style.display=step===1?'block':'none';
+  document.getElementById('boxStep2').style.display=step===2?'block':'none';
+  document.getElementById('boxStep3').style.display=step===3?'block':'none';
+  ['step1ind','step2ind','step3ind'].forEach((id,i)=>{const el=document.getElementById(id);if(i+1<step){el.className='step-item done';}else if(i+1===step){el.className='step-item active';}else{el.className='step-item';}});
+  if(step===2){const pb=document.getElementById('partialPunchBtn');if(pb)pb.style.display='none';}
+  // Update camera badge on step change
+  const labels={1:'ORDER ID',2:'UPC BARCODE',3:'NEXT ORDER ID'};
+  const badge=document.getElementById('camModeBadge');if(badge)badge.textContent=labels[step]||'SCAN';
+  scanCooldown=false; lastScannedVal=null;
+  const bar=document.getElementById('camResultBar');if(bar&&typeof camActive!=='undefined'&&camActive){bar.className='cam-result-bar idle';bar.textContent='Aim barcode at the box...';}
+}
+function showView(v){document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));const el=document.getElementById(v+'View');if(el)el.classList.add('active');if(v==='admin')document.getElementById('navAdmin').classList.add('active');else if(v==='scanner')document.getElementById('navScanner').classList.add('active');}
+
+// ===== VIEW ONLY =====
+function startViewListeners(){
+  ordersListener=fb.listen('/orders',({data})=>{localOrders=data||{};updateViewStats();});
+  fb.get('/orders').then(data=>{localOrders=data||{};updateViewStats();});
+}
+function updateViewStats(){
+  const orders=ordersArray();
+  const groups=buildOrderGroups();
+  const total=groups.length;
+  const done=groups.filter(g=>g.orderStatus==='complete').length;
+  const pending=groups.filter(g=>g.orderStatus==='pending').length;
+  const partial=groups.filter(g=>g.orderStatus==='partial').length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const fmt=n=>n>0?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+  const parseVal=o=>{const v=parseFloat((o.subtotal||'').toString().replace(/[^0-9.]/g,''));return isNaN(v)?0:v;};
+  const doneIds=new Set(groups.filter(g=>g.orderStatus==='complete').map(g=>g.orderId));
+  const pendingIds=new Set(groups.filter(g=>g.orderStatus==='pending').map(g=>g.orderId));
+  const partialIds=new Set(groups.filter(g=>g.orderStatus==='partial').map(g=>g.orderId));
+  const totalVal=orders.reduce((a,o)=>a+parseVal(o),0);
+  const doneVal=orders.filter(o=>doneIds.has(o.orderId)).reduce((a,o)=>a+parseVal(o),0);
+  const pendingVal=orders.filter(o=>pendingIds.has(o.orderId)).reduce((a,o)=>a+parseVal(o),0);
+  const partialVal=orders.filter(o=>partialIds.has(o.orderId)).reduce((a,o)=>a+parseVal(o),0);
+  document.getElementById('vStatTotal').textContent=total;
+  document.getElementById('vStatScanned').textContent=done;
+  document.getElementById('vStatPending').textContent=pending;
+  document.getElementById('vStatPartial').textContent=partial;
+  const at=document.getElementById('vAmtTotal');if(at)at.textContent=fmt(totalVal);
+  const as2=document.getElementById('vAmtScanned');if(as2)as2.textContent=fmt(doneVal);
+  const ap=document.getElementById('vAmtPending');if(ap)ap.textContent=fmt(pendingVal);
+  const apt=document.getElementById('vAmtPartial');if(apt)apt.textContent=fmt(partialVal);
+  document.getElementById('vProgBar').style.width=pct+'%';
+  document.getElementById('vProgLabel').textContent=done+' / '+total+' ('+pct+'%)';
+  document.getElementById('viewLastUpdate').textContent='Updated: '+new Date().toLocaleTimeString();
+}
+
+// Cancel orders import
+function handleCancelDrop(e){e.preventDefault();const files=Array.from(e.dataTransfer.files).filter(f=>/\.(csv|xlsx|xls)$/i.test(f.name));if(files.length)processCancelFile(files[0]);}
+function handleCancelFile(e){if(e.target.files[0])processCancelFile(e.target.files[0]);e.target.value='';}
+function processCancelFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      let data;
+      if(ext==='csv')data=parseCSV(e.target.result);
+      else{const wb=XLSX.read(e.target.result,{type:'binary'});const ws=wb.Sheets[wb.SheetNames[0]];const raw=XLSX.utils.sheet_to_json(ws,{header:1});data={headers:raw[0].map(String),rows:raw.slice(1).map(r=>raw[0].map((h,i)=>String(r[i]??'')))};}
+      const orderCol=data.headers.find(h=>h.toLowerCase().includes('order'));
+      if(!orderCol){document.getElementById('cancelUploadStatus').innerHTML='<div class="alert" style="background:var(--red-dim);border:1px solid var(--red-light);color:var(--red)">✕ No OrderID column found</div>';return;}
+      const hi=data.headers.indexOf(orderCol);
+      const cancelIds=new Set(data.rows.map(r=>String(r[hi]||'').trim()).filter(Boolean));
+      if(!cancelIds.size){document.getElementById('cancelUploadStatus').innerHTML='<div class="alert warn">No order IDs found</div>';return;}
+      let removed=0;
+      const toDelete=Object.entries(localOrders).filter(([k,o])=>cancelIds.has(o.orderId));
+      for(const[k]of toDelete){await fb.del('/orders/'+k);delete localOrders[k];removed++;}
+      for(const id of cancelIds)await fb.del('/locks/'+id);
+      updateAdminStats();renderOrders();
+      document.getElementById('cancelUploadStatus').innerHTML=`<div class="alert success">✓ ${removed} rows removed for ${cancelIds.size} cancelled orders</div>`;
+    }catch(err){document.getElementById('cancelUploadStatus').innerHTML=`<div class="alert" style="background:var(--red-dim);border:1px solid var(--red-light);color:var(--red)">✕ Error: ${err.message}</div>`;}
+  };
+  if(ext==='csv')reader.readAsText(file);else reader.readAsBinaryString(file);
+}
+function switchTab(id,btn){document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='tabOrders')renderOrders();if(id==='tabStations')renderStations();}
+function switchTabByVal(id){switchTab(id,null);}
+
+// Beep sound
+function playBeep(type='success'){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator();const gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    if(type==='success'){osc.frequency.value=880;gain.gain.value=0.3;}
+    else if(type==='error'){osc.frequency.value=220;gain.gain.value=0.4;}
+    else{osc.frequency.value=440;gain.gain.value=0.2;}
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25);
+    osc.stop(ctx.currentTime+0.25);
+  }catch(e){}
+}
+
+function scheduleScan(inputId,fn){clearTimeout(scanTimers[inputId]);const val=document.getElementById(inputId).value.trim();if(!val)return;scanTimers[inputId]=setTimeout(()=>{const el=document.getElementById(inputId);if(el&&el.value.trim())fn();},30);}
+</script>
+<!-- no modal needed, camera is inline -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script>
+// ========== PERSISTENT CAMERA SCANNER ==========
+let camStream=null,camActive=false,torchOn=false,camFacingMode='environment';
+let scanLoopId=null,lastScannedVal=null,scanCooldown=false;
+let barcodeDetector=null,zxingLoaded=false;
+
+async function startCameraMode(){
+  document.getElementById('camStartWrap').style.display='none';
+  document.getElementById('camStrip').classList.add('active');
+  setCamResult('idle','Starting camera...');
+  await startCamStream();
+}
+
+function stopCameraMode(){
+  camActive=false;
+  if(scanLoopId){cancelAnimationFrame(scanLoopId);scanLoopId=null;}
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  const vid=document.getElementById('camVideo');
+  vid.srcObject=null;
+  document.getElementById('camStrip').classList.remove('active');
+  document.getElementById('camStartWrap').style.display='block';
+  torchOn=false;
+}
+
+async function startCamStream(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:camFacingMode,width:{ideal:1280},height:{ideal:720}}
+    });
+    const vid=document.getElementById('camVideo');
+    vid.srcObject=camStream;
+    await vid.play();
+    camActive=true;
+    setCamResult('idle','Aim barcode at the box...');
+    startScanLoop();
+  }catch(e){
+    setCamResult('fail','Camera error: '+e.message);
+    document.getElementById('camStartWrap').style.display='block';
+    document.getElementById('camStrip').classList.remove('active');
+  }
+}
+
+async function toggleTorch(){
+  if(!camStream)return;
+  const track=camStream.getVideoTracks()[0];
+  try{
+    torchOn=!torchOn;
+    await track.applyConstraints({advanced:[{torch:torchOn}]});
+    document.getElementById('camTorchBtn').style.background=torchOn?'#b7791f':'#1a1a1a';
+  }catch(e){alert('Torch not supported on this device');}
+}
+
+async function flipCamera(){
+  camFacingMode=camFacingMode==='environment'?'user':'environment';
+  await startCamStream();
+}
+
+function startScanLoop(){
+  if(typeof BarcodeDetector!=='undefined'){
+    if(!barcodeDetector){
+      barcodeDetector=new BarcodeDetector({formats:[
+        'code_128','code_39','ean_13','ean_8','upc_a','upc_e','qr_code','data_matrix','itf','codabar'
+      ]});
+    }
+    async function tick(){
+      if(!camActive)return;
+      const vid=document.getElementById('camVideo');
+      if(vid.readyState===vid.HAVE_ENOUGH_DATA){
+        try{
+          const barcodes=await barcodeDetector.detect(vid);
+          if(barcodes.length>0){
+            const val=barcodes[0].rawValue.trim();
+            if(val&&val!==lastScannedVal&&!scanCooldown)handleCamResult(val);
+          }
+        }catch(e){}
+      }
+      scanLoopId=requestAnimationFrame(tick);
+    }
+    tick();
+  } else {
+    loadZxingAndScan();
+  }
+}
+
+function loadZxingAndScan(){
+  if(zxingLoaded){startZxingLoop();return;}
+  const s=document.createElement('script');
+  s.src='https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
+  s.onload=()=>{zxingLoaded=true;startZxingLoop();};
+  s.onerror=()=>setCamResult('fail','Scanner library failed to load. Please use Chrome/Edge.');
+  document.head.appendChild(s);
+}
+
+function startZxingLoop(){
+  const vid=document.getElementById('camVideo');
+  const canvas=document.getElementById('camCanvas');
+  const ctx=canvas.getContext('2d');
+  const hints=new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+    ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,
+    ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,
+    ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,
+    ZXing.BarcodeFormat.ITF,ZXing.BarcodeFormat.QR_CODE
+  ]);
+  const reader=new ZXing.MultiFormatReader();
+  reader.setHints(hints);
+  function tick(){
+    if(!camActive)return;
+    if(vid.readyState===vid.HAVE_ENOUGH_DATA){
+      canvas.width=vid.videoWidth;canvas.height=vid.videoHeight;
+      ctx.drawImage(vid,0,0);
+      try{
+        const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const lum=new ZXing.RGBLuminanceSource(imgData.data,canvas.width,canvas.height);
+        const result=reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum)));
+        const val=result.getText().trim();
+        if(val&&val!==lastScannedVal&&!scanCooldown)handleCamResult(val);
+      }catch(e){}
+    }
+    scanLoopId=requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function handleCamResult(val){
+  if(!val||scanCooldown)return;
+  lastScannedVal=val;
+  scanCooldown=true;
+  playBeep('success');
+  setCamResult('ok','✓  '+val);
+
+  let inputId=null;
+  if(scanStep===1) inputId='orderIdInput';
+  else if(scanStep===2) inputId='upcInput';
+  else if(scanStep===3) inputId='nextOrderInput';
+  if(!inputId){setTimeout(()=>{scanCooldown=false;lastScannedVal=null;},2000);return;}
+
+  const inp=document.getElementById(inputId);
+  inp.value=val;
+  inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+
+  if(scanStep===2){
+    // UPC: release quickly so next DIFFERENT UPC scans immediately
+    // lastScannedVal stays to block same barcode re-scan
+    setTimeout(()=>{
+      scanCooldown=false;
+      lastScannedVal=null; // clear so even same UPC can re-scan if needed
+      if(camActive)setCamResult('idle','Aim next barcode...');
+    },1000);
+  } else {
+    // Order ID / Next Order: keep longer cooldown while Firebase loads
+    setTimeout(()=>{
+      scanCooldown=false;
+      lastScannedVal=null;
+      if(camActive)setCamResult('idle','Aim barcode at the box...');
+    },3500);
+  }
+}
+
+function setCamResult(type,msg){
+  const bar=document.getElementById('camResultBar');
+  if(!bar)return;
+  bar.className='cam-result-bar '+type;
+  bar.textContent=msg;
+}
+
+// goToStep override no longer needed — camera logic is built into original goToStep above
+</script>
+
+</body>
+</html>
